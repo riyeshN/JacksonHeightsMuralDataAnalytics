@@ -1,4 +1,7 @@
 from census_data_api.components.api.CensusAPI import CensusAPI
+import pgeocode
+from census_data_api.components.api.CensusAPI import QUEENS_ZIPS
+import pandas as pd
 
 API_KEY = "23af37b06f2e13ebcd77671f57e1da080b1e59c1"
 
@@ -36,5 +39,51 @@ class CensusComponent:
         }
         census_api = CensusAPI(acs_vars = acs_vars, api_key=API_KEY)
         return census_api.get_dataframe_census()
+    
 
+    @staticmethod
+    def get_data_for_zip():
+        coordinates = []
+        nomi = pgeocode.Nominatim('us') # I use pgeocode library
+        
+        for zip in QUEENS_ZIPS:
+            try:
+                info = nomi.query_postal_code(zip)
 
+                lon = float(info.longitude)
+                lat = float(info.latitude)
+                coordinates.append()
+
+            except Exception as ex:
+                print(f"Skipping: {zip} {ex}")
+                continue
+
+        return coordinates
+    
+'''
+   # this is the wrong code, I don't know why, you can try to run this to see the result
+    @staticmethod
+    def get_data_for_zip():
+        coordinates = []
+        nomi = pgeocode.Nominatim('us')
+        
+        for zip in QUEENS_ZIPS:
+            try:
+                info = nomi.query_postal_code(zip)
+
+                coordinates.append({
+                    "zip_code": zip,
+                    "latitude": float(info.latitude),
+                    "longitude": float(info.longitude)
+                })
+
+            except Exception as ex:
+                print(f"Skipping: {zip} {ex}")
+                continue
+
+        df = pd.DataFrame(coordinates)
+        df = df.set_index("zip_code")
+        return df
+    
+'''
+   
