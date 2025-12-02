@@ -123,6 +123,7 @@ const Map = () => {
 
 	useEffect(() => {
 		if (!mapContainerRef.current) return;
+		
 
 		if (!mapRef.current) {
 			mapRef.current = new maplibregl.Map({
@@ -220,6 +221,33 @@ const Map = () => {
 			getFillColorExpression(selectedAttributeForHeatMap)
 		);
 	}, [selectedAttributeForHeatMap]);
+	
+		
+	
+	const LEGENDS: Record<HeatMapVariable, Array<{ color: string; label: string }>> = {
+    Income: [
+        { color: "#fee5d9", label: "30k" },
+        { color: "#fcae91", label: "60k" },
+        { color: "#fb6a4a", label: "90k" },
+        { color: "#cb181d", label: "120k" }
+    	],
+    Age: [
+        { color: "#edf8fb", label: "20" },
+        { color: "#b2e2e2", label: "35" },
+        { color: "#66c2a4", label: "50" },
+        { color: "#238b45", label: "65" }
+    	],
+    PopulationDensity: [
+        { color: "#ffffcc", label: "5k" },
+        { color: "#a1dab4", label: "15k" },
+        { color: "#41b6c4", label: "30k" },
+        { color: "#225ea8", label: "60k" }
+    	]
+	};
+
+
+
+
 
 	function getFillColorExpression(
 		selected: HeatMapVariable
@@ -272,6 +300,47 @@ const Map = () => {
 		}
 	}
 
+
+	const Legend = ({ variable }: { variable: HeatMapVariable }) => {
+    const items = LEGENDS[variable];
+
+    return (
+        <div
+            style={{
+                position: "absolute",
+                top: "10px",
+                right: "10px",
+                backgroundColor: "rgba(255,255,255,0.9)",
+                padding: "10px",
+                borderRadius: "8px",
+                fontSize: "12px",
+                boxShadow: "0px 0px 6px rgba(0,0,0,0.2)",
+                zIndex: 999,
+            }}
+        >
+            <strong>{variable}</strong>
+            {items.map((item, index) => (
+                <div
+                    key={index}
+                    style={{ display: "flex", alignItems: "center", marginTop: "4px" }}
+                >
+                    <div
+                        style={{
+                            width: "16px",
+                            height: "16px",
+                            backgroundColor: item.color,
+                            marginRight: "6px",
+                        }}
+                    />
+                    <span>{item.label}</span>
+                </div>
+            ))}
+        </div>
+    	);
+	};
+
+
+
 	return (
 		<Grid container padding={2}>
 			<Grid size={{ xs: 12 }}>
@@ -309,11 +378,15 @@ const Map = () => {
 						width: "100%",
 						height: "80vh",
 					}}
-				>
+				>					
+
 					<div
 						ref={mapContainerRef}
 						style={{ width: "100%", height: "80vh" }}
 					/>
+
+					<Legend variable={selectedAttributeForHeatMap} />
+
 					{loading ? (
 						<Box
 							sx={{
