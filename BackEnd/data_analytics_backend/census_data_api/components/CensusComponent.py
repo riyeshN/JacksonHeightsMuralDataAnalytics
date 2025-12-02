@@ -1,11 +1,43 @@
 from census_data_api.components.api.CensusAPI import CensusAPI
-import pgeocode
-from census_data_api.components.api.CensusAPI import QUEENS_ZIPS
 import pandas as pd
+import requests
 
 API_KEY = "23af37b06f2e13ebcd77671f57e1da080b1e59c1"
+QUEENS_ZIPS = [
+    "11004","11005",
+    "11101","11102","11103","11104","11105","11106","11109",
+    "11351","11354","11355","11356","11357","11358","11359","11360",
+    "11361","11362","11363","11364","11365","11366","11367","11368",
+    "11369","11370","11371","11372","11373","11374","11375","11377",
+    "11378","11379","11385",
+    "11411","11412","11413","11414","11415","11416","11417","11418",
+    "11419","11420","11421","11422","11423","11426","11427","11428",
+    "11429","11432","11433","11434","11435","11436",
+    "11691","11692","11693","11694","11697"
+]
 
 class CensusComponent:
+
+    @staticmethod
+    def get_census_data_for_queens_with_geo_polygon():
+        census_data_frame = CensusComponent.get_census_data_for_queens_county()
+        census_dict = census_data_frame.to_dict(orient="index")
+        geo_dictionary = CensusComponent.get_data_for_zip()
+
+        mapped_dictionary_census_polygon = {}
+
+        for key, value in geo_dictionary.items():
+            geometry = value['geometry']
+            pop_est = value['pop_est']
+
+            if key in census_dict:
+                current_zipcode_census_value = census_dict[key]
+                mapped_dictionary_census_polygon[key] = {
+                    'geometry': geometry,
+                    'pop_est': pop_est,
+                    'census_data': current_zipcode_census_value
+                }
+        return mapped_dictionary_census_polygon
 
     @staticmethod
     def get_census_data_for_queens_county():
@@ -37,53 +69,31 @@ class CensusComponent:
             "occ_natres_const_maint_female": "C24010_011E",  # Nat. resources, construction, maintenance (Female)
             "occ_prod_transp_mat_female": "C24010_012E",  # Production, transportation, material moving (Female),
         }
-        census_api = CensusAPI(acs_vars = acs_vars, api_key=API_KEY)
+        census_api = CensusAPI(acs_vars = acs_vars, api_key=API_KEY, zip_code=QUEENS_ZIPS)
         return census_api.get_dataframe_census()
-    
 
     @staticmethod
     def get_data_for_zip():
-        coordinates = []
-        nomi = pgeocode.Nominatim('us') # I use pgeocode library
-        
-        for zip in QUEENS_ZIPS:
-            try:
-                info = nomi.query_postal_code(zip)
+        url = "https://data.cityofnewyork.us/api/geospatial/pri4-ifjk?method=export&format=GeoJSON"
+        response = requests.get(url)
+        response.raise_for_status()
+        geojson = response.json()
 
-                lon = float(info.longitude)
-                lat = float(info.latitude)
-                coordinates.append()
+        queens_data = {}
 
-            except Exception as ex:
-                print(f"Skipping: {zip} {ex}")
+        for features in geojson['features']:
+            property = features.get('properties')
+            modzcta = property['modzcta']
+
+            if modzcta not in QUEENS_ZIPS:
                 continue
 
-        return coordinates
-    
-'''
-   # this is the wrong code, I don't know why, you can try to run this to see the result
-    @staticmethod
-    def get_data_for_zip():
-        coordinates = []
-        nomi = pgeocode.Nominatim('us')
-        
-        for zip in QUEENS_ZIPS:
-            try:
-                info = nomi.query_postal_code(zip)
+            queens_data[modzcta] = {
+                'pop_est': property.get("pop_est"),
+                'geometry': features.get("geometry")
+            }
 
-                coordinates.append({
-                    "zip_code": zip,
-                    "latitude": float(info.latitude),
-                    "longitude": float(info.longitude)
-                })
+        return queens_data
 
-            except Exception as ex:
-                print(f"Skipping: {zip} {ex}")
-                continue
 
-        df = pd.DataFrame(coordinates)
-        df = df.set_index("zip_code")
-        return df
-    
-'''
    

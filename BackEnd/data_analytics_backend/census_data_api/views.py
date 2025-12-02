@@ -1,10 +1,24 @@
 import json
-from django.http import HttpResponse, HttpRequest, JsonResponse
 
+from django.core.cache import cache
+from django.http import HttpResponse, HttpRequest, JsonResponse
 from census_data_api.components.CensusComponent import CensusComponent
 
+CACHE_KEY_GEO_CENSUS = "GEO_CENSUS_DATA"
+CACHE_TIME = 60 * 60 * 24
 
 # Create your views here.
+def get_queens_census_data_with_geo_polygon(request):
+    if request.method == "GET":
+        cached_data = cache.get(CACHE_KEY_GEO_CENSUS)
+        if cached_data is not None:
+            return JsonResponse(cached_data, status=200)
+        census_and_geoploygon_data_frame = CensusComponent.get_census_data_for_queens_with_geo_polygon()
+        cache.set(CACHE_KEY_GEO_CENSUS, census_and_geoploygon_data_frame, CACHE_TIME)
+        return JsonResponse(census_and_geoploygon_data_frame, status=200)
+    else:
+        return HttpResponse("Fail", status=400)
+
 def get_queens_census_data(request):
     if request.method == "GET":
         census_data_frame = CensusComponent.get_census_data_for_queens_county()
@@ -17,7 +31,7 @@ def get_queens_census_data(request):
  # For Zip views   
 def get_geojson_data(request):
     if request.method == "GET":
-        census_data_value = CensusComponent.get_data_for_zip()
-        return HttpResponse(census_data_value, status=200)
+        queens_zip = CensusComponent.get_data_for_zip()
+        return JsonResponse(json.loads(queens_zip.to_json()), status=200)
     else:
         return HttpResponse("Fail", status=400)
