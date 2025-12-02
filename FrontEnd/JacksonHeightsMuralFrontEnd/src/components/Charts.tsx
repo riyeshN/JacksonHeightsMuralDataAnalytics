@@ -18,6 +18,11 @@ const Charts = ({ selectedArea }: ChartsProps) => {
 		Other: selectedArea?.["some_other_race"],
 	};
 
+	const population_by_gender = {
+		female: selectedArea?.["female_population"],
+		male: selectedArea?.["male_population"],
+	};
+
 	const occupationTotals = {
 		Management:
 			(selectedArea?.["occ_mgmt_male"] ?? 0) +
@@ -54,6 +59,10 @@ const Charts = ({ selectedArea }: ChartsProps) => {
 					<PieChartComp
 						dataDict={occupationTotals}
 						heading="Occupation Proportion"
+					/>
+					<PieChartComp
+						dataDict={population_by_gender}
+						heading="Gender Proportion"
 					/>
 				</Stack>
 			</Box>
