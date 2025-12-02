@@ -338,7 +338,7 @@ const Map = () => {
 				style={{
 					position: "absolute",
 					bottom: "10px",
-					right: "10px",
+					left: "10px",
 					backgroundColor: "rgba(255,255,255,0.9)",
 					padding: "10px",
 					borderRadius: "8px",
