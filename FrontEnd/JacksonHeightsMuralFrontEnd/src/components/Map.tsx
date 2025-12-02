@@ -3,7 +3,14 @@ import maplibregl, { GeoJSONFeature, GeoJSONSource } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import api from "../api/census";
 import type { ExpressionSpecification } from "maplibre-gl";
-import { Box, Button, ButtonGroup, Grid, LinearProgress } from "@mui/material";
+import {
+	Box,
+	Button,
+	ButtonGroup,
+	Grid,
+	LinearProgress,
+	Stack,
+} from "@mui/material";
 import Charts from "./Charts";
 
 const KEY = "5JiIWH7dkgRJBJPU662Z";
@@ -369,73 +376,80 @@ const Map = () => {
 	};
 
 	return (
-		<Grid container padding={2}>
-			<Grid size={{ xs: 12 }}>
-				<ButtonGroup>
-					<Button
-						onClick={() => setSelectedAttributeForHeatMap("Age")}
-						color={selectedAttributeForHeatMap === "Age" ? "error" : "primary"}
-					>
-						Age
-					</Button>
-					<Button
-						onClick={() => setSelectedAttributeForHeatMap("Income")}
-						color={
-							selectedAttributeForHeatMap === "Income" ? "error" : "primary"
-						}
-					>
-						Income
-					</Button>
-					<Button
-						onClick={() => setSelectedAttributeForHeatMap("PopulationDensity")}
-						color={
-							selectedAttributeForHeatMap === "PopulationDensity"
-								? "error"
-								: "primary"
-						}
-					>
-						Population
-					</Button>
-				</ButtonGroup>
-			</Grid>
-			<Grid size={{ xs: 8 }}>
-				<div
-					style={{
-						position: "relative",
-						width: "100%",
-						height: "80vh",
-					}}
-				>
-					<div
-						ref={mapContainerRef}
-						style={{ width: "100%", height: "80vh" }}
-					/>
-
-					<Legend variable={selectedAttributeForHeatMap} />
-
-					{loading ? (
-						<Box
-							sx={{
-								position: "absolute",
-								inset: 0,
-								display: "flex",
-								justifyContent: "center",
-								alignItems: "flex-end",
-								paddingBottom: "40px",
-								zIndex: 10,
+		<Box alignItems="center">
+			<Stack>
+				<Grid container padding={2}>
+					<Grid size={{ xs: 12 }}>
+						<ButtonGroup>
+							<Button
+								onClick={() => setSelectedAttributeForHeatMap("Age")}
+								color={
+									selectedAttributeForHeatMap === "Age" ? "error" : "primary"
+								}
+							>
+								Age
+							</Button>
+							<Button
+								onClick={() => setSelectedAttributeForHeatMap("Income")}
+								color={
+									selectedAttributeForHeatMap === "Income" ? "error" : "primary"
+								}
+							>
+								Income
+							</Button>
+							<Button
+								onClick={() =>
+									setSelectedAttributeForHeatMap("PopulationDensity")
+								}
+								color={
+									selectedAttributeForHeatMap === "PopulationDensity"
+										? "error"
+										: "primary"
+								}
+							>
+								Population
+							</Button>
+						</ButtonGroup>
+					</Grid>
+					<Grid size={{ xs: 12 }}>
+						<div
+							style={{
+								position: "relative",
+								width: "100%",
+								height: "80vh",
 							}}
 						>
-							<LinearProgress color="secondary" sx={{ width: "60%" }} />
-						</Box>
-					) : (
-						<></>
-					)}
-				</div>
-			</Grid>
-			<Grid size={{ xs: 4 }}>
+							<div
+								ref={mapContainerRef}
+								style={{ width: "100%", height: "80vh" }}
+							/>
+
+							<Legend variable={selectedAttributeForHeatMap} />
+
+							{loading ? (
+								<Box
+									sx={{
+										position: "absolute",
+										inset: 0,
+										display: "flex",
+										justifyContent: "center",
+										alignItems: "flex-end",
+										paddingBottom: "40px",
+										zIndex: 10,
+									}}
+								>
+									<LinearProgress color="secondary" sx={{ width: "60%" }} />
+								</Box>
+							) : (
+								<></>
+							)}
+						</div>
+					</Grid>
+				</Grid>
+
 				<Charts selectedArea={selectedAreaProp} />
-			</Grid>
-		</Grid>
+			</Stack>
+		</Box>
 	);
 };
 

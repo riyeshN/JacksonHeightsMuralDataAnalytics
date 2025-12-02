@@ -54,7 +54,7 @@ const Charts = ({ selectedArea }: ChartsProps) => {
 			style={{ height: "100%" }}
 		>
 			<Box sx={{ width: "100%", maxHeight: "80vh", overflowY: "auto" }}>
-				<Stack padding={2}>
+				<Stack direction="row" padding={2}>
 					<PieChartComp dataDict={dictionary_race} heading="Race Proportion" />
 					<PieChartComp
 						dataDict={occupationTotals}
