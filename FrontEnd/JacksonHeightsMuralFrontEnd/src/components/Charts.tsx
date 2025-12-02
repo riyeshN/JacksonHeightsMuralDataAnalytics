@@ -6,7 +6,6 @@ interface ChartsProps {
 }
 
 const Charts = ({ selectedArea }: ChartsProps) => {
-	console.log("from chart", selectedArea);
 	return !selectedArea ? (
 		<Grid>NOTHING Selected</Grid>
 	) : (

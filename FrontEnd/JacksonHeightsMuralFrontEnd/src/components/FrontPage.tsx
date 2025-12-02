@@ -1,10 +1,5 @@
 import Grid from "@mui/material/Grid";
-import Charts from "./Charts";
 import Map from "./Map";
-import { useEffect, useState } from "react";
-import api from "../api/census";
-import React from "react";
-import { Box, CircularProgress } from "@mui/material";
 
 const FrontPage = () => {
 	return (

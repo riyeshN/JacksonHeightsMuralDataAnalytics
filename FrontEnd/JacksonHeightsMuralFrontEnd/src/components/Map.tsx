@@ -32,6 +32,9 @@ const Map = () => {
 	const [geoObject, setGeoObject] = useState<GeoJSON.FeatureCollection | null>(
 		null
 	);
+	const [muralData, setMuralData] = useState<GeoJSON.FeatureCollection | null>(
+		null
+	);
 	const [selectedAreaProp, setSelectedAreaProp] = useState<
 		{ [name: string]: any } | undefined
 	>(undefined);
@@ -39,7 +42,53 @@ const Map = () => {
 	useEffect(() => {
 		console.log("calling api...");
 		fetchCensusDataForQueens();
+		fetchMuralDataForQueens();
 	}, []);
+
+	const fetchMuralDataForQueens = async () => {
+		try {
+			const response = await api.get("census/mural_data");
+
+			const mural_data: [Record<string, any>] = response?.data;
+
+			const features = mural_data.map(
+				(current) =>
+					({
+						type: "Feature",
+						geometry: {
+							type: "Point",
+							coordinates: [
+								Number(current["longitude"]),
+								Number(current["latitude"]),
+							],
+						},
+						properties: {
+							city: current["city"],
+							inscription: current["inscription"],
+							managing_city_agency: current["managing_city_agency"],
+							title: current["title"],
+							address: current["address"],
+							created_at: current["created_at"],
+							alternate_title: current["alternate_title"],
+							artwork_type1: current["artwork_type1"],
+							artwork_type2: current["artwork_type2"],
+							date_dedicated: current["date_dedicated"],
+						},
+					} as GeoJSON.Feature)
+			);
+
+			const featureCollection: GeoJSON.FeatureCollection = {
+				type: "FeatureCollection",
+				features,
+			};
+
+			console.log("test", featureCollection);
+
+			setMuralData(featureCollection);
+		} catch (error) {
+			alert(`Issue with fetching mural data ${error}`);
+		}
+	};
 
 	const fetchCensusDataForQueens = async () => {
 		try {
@@ -96,7 +145,37 @@ const Map = () => {
 	}, []);
 
 	useEffect(() => {
-		console.log(geoObject);
+		if (!mapRef.current || !muralData) return;
+		const map = mapRef.current;
+
+		console.log("muraldata", muralData);
+
+		if (muralData && map.getSource("murals")) {
+			(map.getSource("murals") as GeoJSONSource).setData(muralData);
+		} else if (muralData) {
+			map.addSource("murals", {
+				type: "geojson",
+				data: muralData,
+			});
+
+			map.addLayer({
+				id: "murals-circle",
+				type: "circle",
+				source: "murals",
+				paint: {
+					"circle-radius": 5,
+					"circle-color": "#c10f0fff",
+					"circle-stroke-color": "#ffffff",
+					"circle-stroke-width": 1,
+				},
+			});
+		}
+		if (map.getLayer("murals-circle")) {
+			map.moveLayer("murals-circle");
+		}
+	}, [muralData]);
+
+	useEffect(() => {
 		if (!mapRef.current || !geoObject) return;
 		const map = mapRef.current;
 
