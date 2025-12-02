@@ -34,6 +34,9 @@ const Map = () => {
 	const [geoObject, setGeoObject] = useState<GeoJSON.FeatureCollection | null>(
 		null
 	);
+	const [muralData, setMuralData] = useState<GeoJSON.FeatureCollection | null>(
+		null
+	);
 	const [selectedAreaProp, setSelectedAreaProp] = useState<
 		{ [name: string]: any } | undefined
 	>(undefined);
@@ -41,6 +44,7 @@ const Map = () => {
 	useEffect(() => {
 		console.log("calling api...");
 		fetchCensusDataForQueens();
+		fetchMuralDataForQueens();
 	}, []);
 
 	const fetchCensusDataForQueens = async () => {
@@ -74,7 +78,50 @@ const Map = () => {
 		}
 	};
 
-	
+	const fetchMuralDataForQueens = async () => {
+		try {
+			const response = await api.get("census/mural_data");
+
+			const mural_data: [Record<string, any>] = response?.data;
+
+			const features = mural_data.map(
+				(current) =>
+					({
+						type: "Feature",
+						geometry: {
+							type: "Point",
+							coordinates: [
+								Number(current["longitude"]),
+								Number(current["latitude"]),
+							],
+						},
+						properties: {
+							city: current["city"],
+							inscription: current["inscription"],
+							managing_city_agency: current["managing_city_agency"],
+							title: current["title"],
+							address: current["address"],
+							created_at: current["created_at"],
+							alternate_title: current["alternate_title"],
+							artwork_type1: current["artwork_type1"],
+							artwork_type2: current["artwork_type2"],
+							date_dedicated: current["date_dedicated"],
+						},
+					} as GeoJSON.Feature)
+			);
+
+			const featureCollection: GeoJSON.FeatureCollection = {
+				type: "FeatureCollection",
+				features,
+			};
+
+			console.log("test", featureCollection);
+
+			setMuralData(featureCollection);
+		} catch (error) {
+			alert(`Issue with fetching mural data ${error}`);
+		}
+	};
 
 	useEffect(() => {
 		if (!mapContainerRef.current) return;
@@ -96,13 +143,44 @@ const Map = () => {
 		popupRef.current = new maplibregl.Popup({
 			closeButton: false,
 			closeOnClick: false,
-		})
+		});
 
 		return () => {
 			mapRef.current?.remove();
 			mapRef.current = null;
 		};
 	}, []);
+
+	useEffect(() => {
+		if (!mapRef.current || !muralData) return;
+		const map = mapRef.current;
+
+		console.log("muraldata", muralData);
+
+		if (muralData && map.getSource("murals")) {
+			(map.getSource("murals") as GeoJSONSource).setData(muralData);
+		} else if (muralData) {
+			map.addSource("murals", {
+				type: "geojson",
+				data: muralData,
+			});
+
+			map.addLayer({
+				id: "murals-circle",
+				type: "circle",
+				source: "murals",
+				paint: {
+					"circle-radius": 5,
+					"circle-color": "#c10f0fff",
+					"circle-stroke-color": "#ffffff",
+					"circle-stroke-width": 1,
+				},
+			});
+		}
+		if (map.getLayer("murals-circle")) {
+			map.moveLayer("murals-circle");
+		}
+	}, [muralData]);
 
 	useEffect(() => {
 		console.log(geoObject);
@@ -132,24 +210,24 @@ const Map = () => {
 			});
 		}
 
-
 		map.on("mousemove", "zip-fill", (e) => {
 			const props = e.features?.[0]?.properties;
-			if(!props || !popupRef.current) return;
+			if (!props || !popupRef.current) return;
 
 			const html = `
 				<div style = "font-size: 14px;">
 					<strong>ZIP: </strong>${props.zip_code}<br/>
-                    <strong>Income: </strong>${props.median_household_income ?? "N/A"}<br/>
+                    <strong>Income: </strong>${
+											props.median_household_income ?? "N/A"
+										}<br/>
                     <strong>Age: </strong>${props.median_age ?? "N/A"}<br/>
-                    <strong>Population: </strong>${props.total_population ?? "N/A"}
+                    <strong>Population: </strong>${
+											props.total_population ?? "N/A"
+										}
 				</div>
 			`;
 
-			popupRef.current
-            	.setLngLat(e.lngLat)
-            	.setHTML(html)
-                .addTo(map);	
+			popupRef.current.setLngLat(e.lngLat).setHTML(html).addTo(map);
 		});
 
 		map.on("mouseleave", "zip-fill", () => {
@@ -176,30 +254,30 @@ const Map = () => {
 			getFillColorExpression(selectedAttributeForHeatMap)
 		);
 	}, [selectedAttributeForHeatMap]);
-	
-		
-	
-	const LEGENDS: Record<HeatMapVariable, Array<{ color: string; label: string }>> = {
-    Income: [
-        { color: "#fee5d9", label: "30k" },
-        { color: "#fcae91", label: "60k" },
-        { color: "#fb6a4a", label: "90k" },
-        { color: "#cb181d", label: "120k" }
-    	],
-    Age: [
-        { color: "#edf8fb", label: "20" },
-        { color: "#b2e2e2", label: "35" },
-        { color: "#66c2a4", label: "50" },
-        { color: "#238b45", label: "65" }
-    	],
-    PopulationDensity: [
-        { color: "#ffffcc", label: "5k" },
-        { color: "#a1dab4", label: "15k" },
-        { color: "#41b6c4", label: "30k" },
-        { color: "#225ea8", label: "60k" }
-    	]
-	};
 
+	const LEGENDS: Record<
+		HeatMapVariable,
+		Array<{ color: string; label: string }>
+	> = {
+		Income: [
+			{ color: "#fee5d9", label: "30k" },
+			{ color: "#fcae91", label: "60k" },
+			{ color: "#fb6a4a", label: "90k" },
+			{ color: "#cb181d", label: "120k" },
+		],
+		Age: [
+			{ color: "#edf8fb", label: "20" },
+			{ color: "#b2e2e2", label: "35" },
+			{ color: "#66c2a4", label: "50" },
+			{ color: "#238b45", label: "65" },
+		],
+		PopulationDensity: [
+			{ color: "#ffffcc", label: "5k" },
+			{ color: "#a1dab4", label: "15k" },
+			{ color: "#41b6c4", label: "30k" },
+			{ color: "#225ea8", label: "60k" },
+		],
+	};
 
 	function getFillColorExpression(
 		selected: HeatMapVariable
@@ -252,46 +330,43 @@ const Map = () => {
 		}
 	}
 
-
 	const Legend = ({ variable }: { variable: HeatMapVariable }) => {
-    const items = LEGENDS[variable];
+		const items = LEGENDS[variable];
 
-    return (
-        <div
-            style={{
-                position: "absolute",
-                bottom: "10px",
-                right: "10px",
-                backgroundColor: "rgba(255,255,255,0.9)",
-                padding: "10px",
-                borderRadius: "8px",
-                fontSize: "12px",
-                boxShadow: "0px 0px 6px rgba(0,0,0,0.2)",
-                zIndex: 999,
-            }}
-        >
-            <strong>{variable}</strong>
-            {items.map((item, index) => (
-                <div
-                    key={index}
-                    style={{ display: "flex", alignItems: "center", marginTop: "4px" }}
-                >
-                    <div
-                        style={{
-                            width: "16px",
-                            height: "16px",
-                            backgroundColor: item.color,
-                            marginRight: "6px",
-                        }}
-                    />
-                    <span>{item.label}</span>
-                </div>
-            ))}
-        </div>
-    	);
+		return (
+			<div
+				style={{
+					position: "absolute",
+					bottom: "10px",
+					right: "10px",
+					backgroundColor: "rgba(255,255,255,0.9)",
+					padding: "10px",
+					borderRadius: "8px",
+					fontSize: "12px",
+					boxShadow: "0px 0px 6px rgba(0,0,0,0.2)",
+					zIndex: 999,
+				}}
+			>
+				<strong>{variable}</strong>
+				{items.map((item, index) => (
+					<div
+						key={index}
+						style={{ display: "flex", alignItems: "center", marginTop: "4px" }}
+					>
+						<div
+							style={{
+								width: "16px",
+								height: "16px",
+								backgroundColor: item.color,
+								marginRight: "6px",
+							}}
+						/>
+						<span>{item.label}</span>
+					</div>
+				))}
+			</div>
+		);
 	};
-
-
 
 	return (
 		<Grid container padding={2}>
@@ -330,8 +405,7 @@ const Map = () => {
 						width: "100%",
 						height: "80vh",
 					}}
-				>					
-
+				>
 					<div
 						ref={mapContainerRef}
 						style={{ width: "100%", height: "80vh" }}
