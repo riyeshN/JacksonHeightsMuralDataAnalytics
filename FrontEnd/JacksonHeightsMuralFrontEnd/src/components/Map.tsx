@@ -398,7 +398,7 @@ const Map = () => {
 					</Button>
 				</ButtonGroup>
 			</Grid>
-			<Grid size={{ xs: 6 }}>
+			<Grid size={{ xs: 8 }}>
 				<div
 					style={{
 						position: "relative",
@@ -432,7 +432,7 @@ const Map = () => {
 					)}
 				</div>
 			</Grid>
-			<Grid>
+			<Grid size={{ xs: 4 }}>
 				<Charts selectedArea={selectedAreaProp} />
 			</Grid>
 		</Grid>
