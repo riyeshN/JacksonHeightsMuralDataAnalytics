@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import maplibregl, { GeoJSONFeature, GeoJSONSource } from "maplibre-gl";
+import maplibregl, { GeoJSONSource } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import api from "../api/census";
 import type { ExpressionSpecification } from "maplibre-gl";
@@ -12,6 +12,7 @@ import {
 	Stack,
 } from "@mui/material";
 import Charts from "./Charts";
+import SearchEngine from "./utils/SearchEngine";
 
 const KEY = "5JiIWH7dkgRJBJPU662Z";
 
@@ -44,6 +45,9 @@ const Map = () => {
 	const [muralData, setMuralData] = useState<GeoJSON.FeatureCollection | null>(
 		null
 	);
+	const [selectedMuralId, setSelectedMuralId] = useState<
+		string | number | null
+	>(null);
 	const [selectedAreaProp, setSelectedAreaProp] = useState<
 		{ [name: string]: any } | undefined
 	>(undefined);
@@ -92,9 +96,10 @@ const Map = () => {
 			const mural_data: [Record<string, any>] = response?.data;
 
 			const features = mural_data.map(
-				(current) =>
+				(current, id) =>
 					({
 						type: "Feature",
+						id: current["id"] ?? id,
 						geometry: {
 							type: "Point",
 							coordinates: [
@@ -113,6 +118,7 @@ const Map = () => {
 							artwork_type1: current["artwork_type1"],
 							artwork_type2: current["artwork_type2"],
 							date_dedicated: current["date_dedicated"],
+							zipcode: current["zip_code"],
 						},
 					} as GeoJSON.Feature)
 			);
@@ -138,7 +144,9 @@ const Map = () => {
 				container: mapContainerRef.current,
 				style: `https://api.maptiler.com/maps/darkmatter/style.json?key=${KEY}`,
 				center: [-73.885, 40.75],
-				zoom: 11,
+				zoom: 10,
+				minZoom: 10,
+				maxZoom: 12,
 			});
 
 			mapRef.current.addControl(
@@ -183,11 +191,42 @@ const Map = () => {
 					"circle-stroke-width": 1,
 				},
 			});
+
+			map.addLayer({
+				id: "murals-highlight",
+				type: "circle",
+				source: "murals",
+				paint: {
+					"circle-radius": 9,
+					"circle-color": "#ffff00",
+					"circle-stroke-color": "#000000",
+					"circle-stroke-width": 2,
+				},
+
+				filter: ["==", ["id"], -1],
+			});
 		}
+
 		if (map.getLayer("murals-circle")) {
 			map.moveLayer("murals-circle");
 		}
+		if (map.getLayer("murals-highlight")) {
+			map.moveLayer("murals-highlight");
+		}
 	}, [muralData]);
+
+	useEffect(() => {
+		if (!mapRef.current) return;
+		const map = mapRef.current;
+
+		if (!map.getLayer("murals-highlight")) return;
+
+		if (selectedMuralId == null) {
+			map.setFilter("murals-highlight", ["==", ["id"], -1]); // match nothing
+		} else {
+			map.setFilter("murals-highlight", ["==", ["id"], selectedMuralId]);
+		}
+	}, [selectedMuralId]);
 
 	useEffect(() => {
 		console.log(geoObject);
@@ -215,6 +254,23 @@ const Map = () => {
 					"fill-color": getFillColorExpression(selectedAttributeForHeatMap),
 				},
 			});
+		}
+
+		if (!map.getLayer("zip-highlight")) {
+			map.addLayer({
+				id: "zip-highlight",
+				type: "line",
+				source: "queenszip",
+				paint: {
+					"line-color": "#ffeb3b",
+					"line-width": 4,
+				},
+				filter: ["==", "zip_code", ""],
+			});
+		}
+
+		if (map.getLayer("murals-circle")) {
+			map.moveLayer("murals-circle");
 		}
 
 		map.on("mousemove", "zip-fill", (e) => {
@@ -246,6 +302,9 @@ const Map = () => {
 		map.on("click", "zip-fill", (element) => {
 			const props = element.features?.[0]?.properties;
 			setSelectedAreaProp(props);
+			if (props?.zip_code) {
+				map.setFilter("zip-highlight", ["==", "zip_code", props.zip_code]);
+			}
 		});
 	}, [geoObject]);
 
@@ -261,6 +320,21 @@ const Map = () => {
 			getFillColorExpression(selectedAttributeForHeatMap)
 		);
 	}, [selectedAttributeForHeatMap]);
+
+	const handleSelectMural = (feature: GeoJSON.Feature) => {
+		if (!mapRef.current) return;
+		if (feature.geometry?.type !== "Point") return;
+
+		const [lng, lat] = feature.geometry.coordinates as [number, number];
+
+		mapRef.current.flyTo({
+			center: [lng, lat],
+			zoom: 15, // tweak as you like
+			speed: 1.2, // lower = slower, higher = faster
+			curve: 1.6,
+			essential: true, // respect prefers-reduced-motion = false
+		});
+	};
 
 	const LEGENDS: Record<
 		HeatMapVariable,
@@ -411,7 +485,7 @@ const Map = () => {
 							</Button>
 						</ButtonGroup>
 					</Grid>
-					<Grid size={{ xs: 12 }}>
+					<Grid size={{ xs: 8 }}>
 						<div
 							style={{
 								position: "relative",
@@ -444,6 +518,36 @@ const Map = () => {
 								<></>
 							)}
 						</div>
+					</Grid>
+					<Grid size={{ xs: 4 }}>
+						<SearchEngine
+							muralData={muralData}
+							onSelectMural={(feature) => {
+								const map = mapRef.current;
+								if (!map) return;
+
+								// 1) Set highlight
+								if (feature.id != null) {
+									setSelectedMuralId(feature.id);
+								}
+
+								// 2) Optionally set right panel info
+								setSelectedAreaProp(feature.properties as any);
+
+								// 3) Fly to that point
+								if (feature.geometry.type === "Point") {
+									const coords = feature.geometry.coordinates as [
+										number,
+										number
+									];
+									map.flyTo({
+										center: coords,
+										zoom: 14,
+										essential: true,
+									});
+								}
+							}}
+						/>
 					</Grid>
 				</Grid>
 
