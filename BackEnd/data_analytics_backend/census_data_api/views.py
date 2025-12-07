@@ -26,10 +26,10 @@ def get_mta_data(request):
     if request.method == "GET":
         cache_data = cache.get(CACHE_KEY_MTA)
         if cache_data is not None:
-            return JsonResponse(cache_data, status=200)
+            return JsonResponse(cache_data, safe=False, status=200)
         mta_data = MTAComponent.get_mta_data()
         cache.set(CACHE_KEY_MTA,mta_data, CACHE_TIME)
-        return JsonResponse(mta_data, status=200)
+        return JsonResponse(mta_data, safe=False, status=200)
     else:
         return HttpResponse("Fail", status=400)
 
