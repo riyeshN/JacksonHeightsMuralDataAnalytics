@@ -10,7 +10,7 @@ class CafeComponent:
   def fetch_nyc_geom():
       url = NYC_CAFE_URL
       try:
-          response = requests.get(url)
+          response = requests.get(url, headers={"X-App-Token": APP_TOKEN_})
           response.raise_for_status()
           data = response.json()
   
