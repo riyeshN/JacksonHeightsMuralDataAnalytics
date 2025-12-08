@@ -1,11 +1,14 @@
 import requests
 
+NYC_CAFE_URL = "https://data.cityofnewyork.us/api/v3/views/ptd9-4c6m/query.json"
+APP_TOKEN = "rldrJG5WYd9xQ3fpzBT1JQr9q"
+
 class CafeComponent:
 
   
   @staticmethod
   def fetch_nyc_geom():
-      url = "https://data.cityofnewyork.us/api/v3/views/ptd9-4c6m/query.json"
+      url = NYC_CAFE_URL
       try:
           response = requests.get(url)
           response.raise_for_status()
