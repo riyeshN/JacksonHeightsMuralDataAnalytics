@@ -4,10 +4,12 @@ from django.http import HttpResponse, HttpRequest, JsonResponse
 from census_data_api.components.CensusComponent import CensusComponent
 from census_data_api.components.ArtDataComponent import ArtDataComponent
 from census_data_api.components.MTAComponent import MTAComponent
+from census_data_api.components.OrganizationComponent import OrganizationComponent
 
 CACHE_KEY_GEO_CENSUS = "GEO_CENSUS_DATA"
 CACHE_KEY_MURAL = "MURAL_DATA"
 CACHE_KEY_MTA = "MTA_DATA"
+CACHE_KEY_ORG = "ORG_DATA"
 CACHE_TIME = 60 * 60 * 24
 
 # Create your views here.
@@ -30,6 +32,17 @@ def get_mta_data(request):
         mta_data = MTAComponent.get_mta_data()
         cache.set(CACHE_KEY_MTA,mta_data, CACHE_TIME)
         return JsonResponse(mta_data, status=200)
+    else:
+        return HttpResponse("Fail", status=400)
+
+def get_organization_data(request):
+    if request.method == "GET":
+        cache_data = cache.get(CACHE_KEY_ORG)
+        if cache_data is not None:
+            return JsonResponse(cache_data, status=200)
+        org_data = OrganizationComponent.get_org_data()
+        cache.set(CACHE_KEY_ORG,org_data, CACHE_TIME)
+        return JsonResponse(org_data, status=200)
     else:
         return HttpResponse("Fail", status=400)
 

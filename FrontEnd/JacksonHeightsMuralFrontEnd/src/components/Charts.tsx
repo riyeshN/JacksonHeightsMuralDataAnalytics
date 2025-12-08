@@ -46,7 +46,7 @@ const Charts = ({ selectedArea }: ChartsProps) => {
 	};
 
 	return !selectedArea ? (
-		<Grid>NOTHING Selected</Grid>
+		<Grid></Grid>
 	) : (
 		<Grid
 			alignItems="center"
