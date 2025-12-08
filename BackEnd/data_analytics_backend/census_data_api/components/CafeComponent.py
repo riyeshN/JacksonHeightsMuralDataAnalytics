@@ -1,7 +1,7 @@
 import requests
 
 NYC_CAFE_URL = "https://data.cityofnewyork.us/api/v3/views/ptd9-4c6m/query.json"
-APP_TOKEN = "rldrJG5WYd9xQ3fpzBT1JQr9q"
+APP_TOKEN_ = "rldrJG5WYd9xQ3fpzBT1JQr9q"
 
 class CafeComponent:
 
