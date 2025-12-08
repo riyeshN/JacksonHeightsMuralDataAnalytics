@@ -5,19 +5,19 @@ APP_TOKEN_ = "rldrJG5WYd9xQ3fpzBT1JQr9q"
 
 class CafeComponent:
 
-  
-  @staticmethod
-  def fetch_nyc_geom():
-      url = NYC_CAFE_URL
-      try:
-          response = requests.get(url, headers={"X-App-Token": APP_TOKEN_})
-          response.raise_for_status()
-          data = response.json()
-  
-          # Extract the_geom from each row (geospatial coordinate data
-          geom_list = [row[-1] for row in data.get("data", [])]  
-          return geom_list
-  
-      except requests.RequestException as e:
-          print(f"Error fetching NYC data: {e}")
-          return []
+    @staticmethod
+    def fetch_nyc_geom():
+        url = NYC_CAFE_URL
+        try:
+            response = requests.get(url, headers={"X-App-Token": APP_TOKEN_})
+            response.raise_for_status()
+            data = response.json()
+
+            # the_geom is in the FIRST column → index 0
+            geom_list = [row[0] for row in data.get("data", [])]
+
+            return geom_list
+
+        except requests.RequestException as e:
+            print(f"Error fetching NYC data: {e}")
+            return []
