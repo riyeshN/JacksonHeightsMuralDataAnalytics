@@ -16,16 +16,34 @@ import SearchEngine from "./utils/SearchEngine";
 
 const KEY = "5JiIWH7dkgRJBJPU662Z";
 
+export interface ArtData {
+	title: string[];
+	name: [
+		{
+			first_name: string;
+			last_name: string;
+			middle_name: string;
+		}
+	];
+	date_created: string;
+	art_work_type: string[];
+	keywords: string;
+	inscriptions: string;
+	managing_agency: string;
+	location: {
+		address: string;
+		city: string;
+		zip_code: string;
+		latitude: string;
+		longitude: string;
+		name: string;
+	};
+}
+
 interface censusData {
 	geometry: GeoJSON.Geometry;
 	pop_est: null | number;
 	census_data: Record<string, any>;
-}
-
-interface HeatMapConfig {
-	label: string;
-	property: string;
-	range: Record<number, string>;
 }
 
 type HeatMapVariable = "Age" | "PopulationDensity" | "Income";
@@ -42,12 +60,13 @@ const Map = () => {
 	const [geoObject, setGeoObject] = useState<GeoJSON.FeatureCollection | null>(
 		null
 	);
-	const [muralData, setMuralData] = useState<GeoJSON.FeatureCollection | null>(
+	const [artData, setArtData] = useState<GeoJSON.FeatureCollection<
+		GeoJSON.Point,
+		ArtData
+	> | null>(null);
+	const [selectedArtId, setSelectedArtId] = useState<string | number | null>(
 		null
 	);
-	const [selectedMuralId, setSelectedMuralId] = useState<
-		string | number | null
-	>(null);
 	const [selectedAreaProp, setSelectedAreaProp] = useState<
 		{ [name: string]: any } | undefined
 	>(undefined);
@@ -91,49 +110,64 @@ const Map = () => {
 
 	const fetchMuralDataForQueens = async () => {
 		try {
-			const response = await api.get("census/mural_data");
+			const response = await api.get("census/art_data");
+			console.log(response.data?.ArtList);
 
-			const mural_data: [Record<string, any>] = response?.data;
+			const mural_data: [ArtData] = response?.data?.ArtList;
 
 			const features = mural_data.map(
-				(current, id) =>
+				(current) =>
 					({
 						type: "Feature",
-						id: current["id"] ?? id,
+						id: current?.title[0],
 						geometry: {
 							type: "Point",
 							coordinates: [
-								Number(current["longitude"]),
-								Number(current["latitude"]),
+								Number(current?.location?.longitude),
+								Number(current?.location?.latitude),
 							],
 						},
 						properties: {
-							city: current["city"],
-							inscription: current["inscription"],
-							managing_city_agency: current["managing_city_agency"],
-							title: current["title"],
-							address: current["address"],
-							created_at: current["created_at"],
-							alternate_title: current["alternate_title"],
-							artwork_type1: current["artwork_type1"],
-							artwork_type2: current["artwork_type2"],
-							date_dedicated: current["date_dedicated"],
-							zipcode: current["zip_code"],
+							id: current?.title[0],
+							title: current?.title,
+							name: current?.name,
+							date_created: current?.date_created,
+							art_work_type: current?.art_work_type,
+							keywords: current?.keywords,
+							inscriptions: current?.inscriptions,
+							managing_agency: current?.managing_agency,
+							location: current?.location,
 						},
-					} as GeoJSON.Feature)
+					} as GeoJSON.Feature<GeoJSON.Point, ArtData>)
 			);
 
-			const featureCollection: GeoJSON.FeatureCollection = {
+			const featureCollection: GeoJSON.FeatureCollection<
+				GeoJSON.Point,
+				ArtData
+			> = {
 				type: "FeatureCollection",
 				features,
 			};
 
-			console.log("test", featureCollection);
-
-			setMuralData(featureCollection);
+			setArtData(featureCollection);
 		} catch (error) {
 			alert(`Issue with fetching mural data ${error}`);
 		}
+	};
+
+	const reorderLayers = (map: maplibregl.Map) => {
+		const order = [
+			"zip-fill",
+			"zip-highlight",
+			"murals-circle",
+			"murals-highlight",
+		];
+
+		order.forEach((layerId) => {
+			if (map.getLayer(layerId)) {
+				map.moveLayer(layerId);
+			}
+		});
 	};
 
 	useEffect(() => {
@@ -167,17 +201,15 @@ const Map = () => {
 	}, []);
 
 	useEffect(() => {
-		if (!mapRef.current || !muralData) return;
+		if (!mapRef.current || !artData) return;
 		const map = mapRef.current;
 
-		console.log("muraldata", muralData);
-
-		if (muralData && map.getSource("murals")) {
-			(map.getSource("murals") as GeoJSONSource).setData(muralData);
-		} else if (muralData) {
+		if (artData && map.getSource("murals")) {
+			(map.getSource("murals") as GeoJSONSource).setData(artData);
+		} else {
 			map.addSource("murals", {
 				type: "geojson",
-				data: muralData,
+				data: artData,
 			});
 
 			map.addLayer({
@@ -202,8 +234,7 @@ const Map = () => {
 					"circle-stroke-color": "#000000",
 					"circle-stroke-width": 2,
 				},
-
-				filter: ["==", ["id"], -1],
+				filter: ["==", "id", ""],
 			});
 		}
 
@@ -213,23 +244,23 @@ const Map = () => {
 		if (map.getLayer("murals-highlight")) {
 			map.moveLayer("murals-highlight");
 		}
-	}, [muralData]);
+		reorderLayers(map);
+	}, [artData]);
 
 	useEffect(() => {
 		if (!mapRef.current) return;
 		const map = mapRef.current;
-
 		if (!map.getLayer("murals-highlight")) return;
 
-		if (selectedMuralId == null) {
-			map.setFilter("murals-highlight", ["==", ["id"], -1]); // match nothing
+		if (selectedArtId == null) {
+			map.setFilter("murals-highlight", ["==", "id", ""]);
 		} else {
-			map.setFilter("murals-highlight", ["==", ["id"], selectedMuralId]);
+			map.setFilter("murals-highlight", ["==", "id", selectedArtId]);
 		}
-	}, [selectedMuralId]);
+		reorderLayers(map);
+	}, [selectedArtId]);
 
 	useEffect(() => {
-		console.log(geoObject);
 		if (!mapRef.current || !geoObject) return;
 		const map = mapRef.current;
 
@@ -262,7 +293,7 @@ const Map = () => {
 				type: "line",
 				source: "queenszip",
 				paint: {
-					"line-color": "#ffeb3b",
+					"line-color": "#ffff00",
 					"line-width": 4,
 				},
 				filter: ["==", "zip_code", ""],
@@ -306,6 +337,7 @@ const Map = () => {
 				map.setFilter("zip-highlight", ["==", "zip_code", props.zip_code]);
 			}
 		});
+		reorderLayers(map);
 	}, [geoObject]);
 
 	useEffect(() => {
@@ -321,30 +353,15 @@ const Map = () => {
 		);
 	}, [selectedAttributeForHeatMap]);
 
-	const handleSelectMural = (feature: GeoJSON.Feature) => {
-		if (!mapRef.current) return;
-		if (feature.geometry?.type !== "Point") return;
-
-		const [lng, lat] = feature.geometry.coordinates as [number, number];
-
-		mapRef.current.flyTo({
-			center: [lng, lat],
-			zoom: 15, // tweak as you like
-			speed: 1.2, // lower = slower, higher = faster
-			curve: 1.6,
-			essential: true, // respect prefers-reduced-motion = false
-		});
-	};
-
 	const LEGENDS: Record<
 		HeatMapVariable,
 		Array<{ color: string; label: string }>
 	> = {
 		Income: [
-			{ color: "#fee5d9", label: "30k" },
-			{ color: "#fcae91", label: "60k" },
-			{ color: "#fb6a4a", label: "90k" },
-			{ color: "#cb181d", label: "120k" },
+			{ color: "#f5f9faff", label: "30k" },
+			{ color: "#8ec7d6ff", label: "60k" },
+			{ color: "#337385ff", label: "90k" },
+			{ color: "#083e4dff", label: "120k" },
 		],
 		Age: [
 			{ color: "#edf8fb", label: "20" },
@@ -370,13 +387,13 @@ const Map = () => {
 					["linear"],
 					["get", "median_household_income"],
 					30000,
-					"#fee5d9",
+					"#f5f9faff",
 					60000,
-					"#fcae91",
+					"#8ec7d6ff",
 					90000,
-					"#fb6a4a",
+					"#337385ff",
 					120000,
-					"#cb181d",
+					"#083e4dff",
 				];
 
 			case "Age":
@@ -521,20 +538,15 @@ const Map = () => {
 					</Grid>
 					<Grid size={{ xs: 4 }}>
 						<SearchEngine
-							muralData={muralData}
+							artData={artData}
 							onSelectMural={(feature) => {
 								const map = mapRef.current;
 								if (!map) return;
 
-								// 1) Set highlight
 								if (feature.id != null) {
-									setSelectedMuralId(feature.id);
+									setSelectedArtId(feature.id);
 								}
 
-								// 2) Optionally set right panel info
-								setSelectedAreaProp(feature.properties as any);
-
-								// 3) Fly to that point
 								if (feature.geometry.type === "Point") {
 									const coords = feature.geometry.coordinates as [
 										number,

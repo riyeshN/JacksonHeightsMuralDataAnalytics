@@ -8,30 +8,16 @@ import {
 	Typography,
 	Button,
 } from "@mui/material";
-import type { Feature, Point } from "geojson";
+import type { ArtData } from "../Map";
 
-interface MuralProperties {
-	address?: string | null;
-	alternate_title?: string | null;
-	artwork_type1?: string | null;
-	artwork_type2?: string | null;
-	city?: string | null;
-	created_at?: string | null;
-	date_dedicated?: string | null;
-	inscription?: string | null;
-	managing_city_agency?: string | null;
-	title?: string | null;
-	zipcode?: string | null;
-}
-
-type MuralFeature = Feature<Point, MuralProperties>;
+type ArtFeature = GeoJSON.Feature<GeoJSON.Point, ArtData>;
 
 interface SearchEngineProps {
-	muralData: GeoJSON.FeatureCollection | null;
-	onSelectMural?: (feature: MuralFeature) => void;
+	artData: GeoJSON.FeatureCollection<GeoJSON.Point, ArtData> | null;
+	onSelectMural?: (feature: ArtFeature) => void;
 }
 
-const SearchEngine = ({ muralData, onSelectMural }: SearchEngineProps) => {
+const SearchEngine = ({ artData, onSelectMural }: SearchEngineProps) => {
 	const [query, setQuery] = useState("");
 	const [page, setPage] = useState(1);
 	const pageSize = 10;
@@ -40,41 +26,57 @@ const SearchEngine = ({ muralData, onSelectMural }: SearchEngineProps) => {
 		setPage(1);
 	}, [query]);
 
-	const murals: MuralFeature[] = useMemo(
-		() => (muralData?.features as MuralFeature[]) ?? [],
-		[muralData]
-	);
-
-	// Filter murals based on title / address / city / agency
 	const filteredMurals = useMemo(() => {
-		const q = query.trim().toLowerCase();
-		if (!q) return murals;
+		if (!artData || !artData.features) {
+			return [];
+		}
 
-		return murals.filter((feature) => {
-			const props = feature.properties || {};
-			const haystack = [
-				props.title,
-				props.alternate_title,
-				props.address,
-				props.city,
-				props.managing_city_agency,
-				props.artwork_type1,
-				props.artwork_type2,
+		const lowerCaseQuery = query.toLowerCase().trim();
+
+		return (artData.features as ArtFeature[]).filter((feature) => {
+			const props = feature.properties;
+			if (!props) return false;
+
+			const artists_names = props.name
+				?.map((curr) => {
+					const artist_name_list = [
+						curr.first_name,
+						curr.middle_name,
+						curr.last_name,
+					];
+					return artist_name_list
+						.filter((name) => name && name !== "NULL" && name.trim().length > 0)
+						.join(" ")
+						.trim();
+				})
+				.filter((curr) => curr.length > 0);
+
+			const artistName =
+				artists_names.length > 0 ? artists_names.join(", ") : "";
+
+			const searchableFields = [
+				props.title?.join(" ") || "",
+				artistName,
+				props.keywords || "",
+				props.managing_agency || "",
+				props.location?.name || "",
 			]
-				.filter(Boolean)
 				.join(" ")
 				.toLowerCase();
 
-			return haystack.includes(q);
+			return searchableFields.includes(lowerCaseQuery);
 		});
-	}, [query, murals]);
+	}, [artData, query]);
 
-	const totalPages = Math.ceil(filteredMurals.length / pageSize) || 1;
+	const totalPages = useMemo(() => {
+		return Math.ceil(filteredMurals.length / pageSize);
+	}, [filteredMurals]);
 
 	const pagedMurals = useMemo(() => {
 		const start = (page - 1) * pageSize;
-		return filteredMurals.slice(start, start + pageSize);
-	}, [filteredMurals, page]);
+		const end = start + pageSize;
+		return filteredMurals.slice(start, end);
+	}, [filteredMurals, page, pageSize]);
 
 	return (
 		<Stack spacing={2} padding={2} sx={{ height: "100%" }}>
@@ -94,54 +96,81 @@ const SearchEngine = ({ muralData, onSelectMural }: SearchEngineProps) => {
 					maxHeight: "60vh",
 				}}
 			>
-				{pagedMurals.length === 0 ? (
+				{artData && filteredMurals.length === 0 ? (
 					<Typography variant="body2" color="text.secondary">
-						{query ? `No murals found for “${query}”.` : "No murals loaded."}
+						{query
+							? `No murals found for “${query}”.`
+							: "No murals matched the filter."}
 					</Typography>
 				) : (
 					pagedMurals.map((feature, idx) => {
-						const props = feature.properties || {};
+						const props: ArtData = feature.properties;
+
+						const title = props.title?.[0] || "Untitled mural";
+						const artists_names = props.name
+							?.map((curr) => {
+								const artist_name_list = [
+									curr.first_name,
+									curr.middle_name,
+									curr.last_name,
+								];
+								return artist_name_list
+									.filter(
+										(name) => name && name !== "NULL" && name.trim().length > 0
+									)
+									.join(" ")
+									.trim();
+							})
+							.filter((curr) => curr.length > 0);
+
+						const artistName =
+							artists_names.length > 0 ? artists_names.join(", ") : "";
+
+						const address =
+							props.location.address && props.location.address !== "NULL"
+								? props.location?.address
+								: props.location?.name.trim();
+
 						return (
 							<Card
-								key={idx}
+								key={feature.id || idx}
 								sx={{ mb: 1, cursor: onSelectMural ? "pointer" : "default" }}
 								onClick={() => onSelectMural?.(feature)}
 							>
 								<CardContent>
-									<Typography variant="h6">
-										{props.title || "Untitled mural"}
-									</Typography>
+									<Typography variant="h6">{title}</Typography>
 
-									{props.alternate_title &&
-										props.alternate_title !== "NULL" && (
-											<Typography variant="subtitle2" color="text.secondary">
-												{props.alternate_title}
-											</Typography>
-										)}
+									{artistName && (
+										<Typography variant="subtitle2" color="text.primary">
+											Artist: {artistName}
+										</Typography>
+									)}
 
-									<Typography variant="body2">
-										{props.address || "No address listed"}
-									</Typography>
+									{address && (
+										<Typography variant="body2">Location: {address}</Typography>
+									)}
 
 									<Typography variant="body2" color="text.secondary">
-										{[props.city, props.zipcode].filter(Boolean).join(", ")}
+										{[props.location?.city, props.location?.zip_code]
+											.filter(Boolean)
+											.join(", ")}
 									</Typography>
 
-									{props.managing_city_agency && (
-										<Typography variant="caption" color="text.secondary">
-											Agency: {props.managing_city_agency}
-										</Typography>
-									)}
+									<Typography
+										variant="caption"
+										color="text.secondary"
+										sx={{ display: "block" }}
+									>
+										Agency: {props.managing_agency || "N/A"}
+									</Typography>
 
-									{props.date_dedicated && (
-										<Typography
-											variant="caption"
-											color="text.secondary"
-											sx={{ display: "block" }}
-										>
-											Dedicated: {props.date_dedicated}
-										</Typography>
-									)}
+									<Typography
+										variant="caption"
+										color="text.secondary"
+										sx={{ display: "block" }}
+									>
+										Date Created: {props.date_created || "N/A"}
+									</Typography>
 								</CardContent>
 							</Card>
 						);
@@ -149,30 +178,33 @@ const SearchEngine = ({ muralData, onSelectMural }: SearchEngineProps) => {
 				)}
 			</Box>
 
-			<Stack direction="row" justifyContent="space-between" mt={1}>
-				<Typography variant="caption">
-					Page {page} of {totalPages}
-				</Typography>
+			{filteredMurals.length > 0 && (
+				<Stack direction="row" justifyContent="space-between" mt={1}>
+					<Typography variant="caption">
+						Showing {pagedMurals.length} of {filteredMurals.length} results.
+						Page {page} of {totalPages}
+					</Typography>
 
-				<Stack direction="row" spacing={1}>
-					<Button
-						size="small"
-						variant="outlined"
-						disabled={page <= 1}
-						onClick={() => setPage((p) => p - 1)}
-					>
-						Prev
-					</Button>
-					<Button
-						size="small"
-						variant="outlined"
-						disabled={page >= totalPages}
-						onClick={() => setPage((p) => p + 1)}
-					>
-						Next
-					</Button>
+					<Stack direction="row" spacing={1}>
+						<Button
+							size="small"
+							variant="outlined"
+							disabled={page <= 1}
+							onClick={() => setPage((p) => p - 1)}
+						>
+							Prev
+						</Button>
+						<Button
+							size="small"
+							variant="outlined"
+							disabled={page >= totalPages}
+							onClick={() => setPage((p) => p + 1)}
+						>
+							Next
+						</Button>
+					</Stack>
 				</Stack>
-			</Stack>
+			)}
 		</Stack>
 	);
 };

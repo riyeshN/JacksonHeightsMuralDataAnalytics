@@ -2,7 +2,7 @@ import json
 from django.core.cache import cache
 from django.http import HttpResponse, HttpRequest, JsonResponse
 from census_data_api.components.CensusComponent import CensusComponent
-from census_data_api.components.MuralComponent import MuralComponent
+from census_data_api.components.ArtDataComponent import ArtDataComponent
 from census_data_api.components.MTAComponent import MTAComponent
 
 CACHE_KEY_GEO_CENSUS = "GEO_CENSUS_DATA"
@@ -11,12 +11,12 @@ CACHE_KEY_MTA = "MTA_DATA"
 CACHE_TIME = 60 * 60 * 24
 
 # Create your views here.
-def get_mural_data(request):
+def get_art_data(request):
     if request.method == "GET":
         cached_data = cache.get(CACHE_KEY_MURAL)
         if cached_data is not None:
             return JsonResponse(cached_data,safe=False, status=200)
-        data_for_mural = MuralComponent.get_mural_locations()
+        data_for_mural = ArtDataComponent.get_all_art()
         cache.set(CACHE_KEY_MURAL, data_for_mural, CACHE_TIME)
         return JsonResponse(data_for_mural,safe=False, status=200)
     else:
