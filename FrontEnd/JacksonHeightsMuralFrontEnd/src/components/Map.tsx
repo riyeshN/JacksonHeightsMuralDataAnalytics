@@ -64,9 +64,18 @@ const Map = () => {
 		GeoJSON.Point,
 		ArtData
 	> | null>(null);
-	const [orgData, setOrgData] = useState<GeoJSON.FeatureCollection<GeoJSON.Point, any> | null>(null);
-	const [cafePolygons, setCafePolygons] = useState<GeoJSON.FeatureCollection<GeoJSON.Polygon, any> | null>(null);
-	const [cafePoints, setCafePoints] = useState<GeoJSON.FeatureCollection<GeoJSON.Point, any> | null>(null);
+	const [orgData, setOrgData] = useState<GeoJSON.FeatureCollection<
+		GeoJSON.Point,
+		any
+	> | null>(null);
+	const [cafePolygons, setCafePolygons] = useState<GeoJSON.FeatureCollection<
+		GeoJSON.Polygon,
+		any
+	> | null>(null);
+	const [cafePoints, setCafePoints] = useState<GeoJSON.FeatureCollection<
+		GeoJSON.Point,
+		any
+	> | null>(null);
 	const [selectedArtId, setSelectedArtId] = useState<string | number | null>(
 		null
 	);
@@ -77,26 +86,31 @@ const Map = () => {
 	// User-supplied Queens polygon (ordered as [lon, lat] pairs)
 	const queensPolygon: Array<[number, number]> = [
 		[-73.95, 40.78], // NW
-		[-73.70, 40.78], // NE
-		[-73.70, 40.66], // SE
+		[-73.7, 40.78], // NE
+		[-73.7, 40.66], // SE
 		[-73.85, 40.63], // SW
 	];
 
 	// Ray-casting point-in-polygon for [lon, lat]
-	const pointInPolygon = (point: [number, number], polygon: Array<[number, number]>): boolean => {
+	const pointInPolygon = (
+		point: [number, number],
+		polygon: Array<[number, number]>
+	): boolean => {
 		const x = point[0];
 		const y = point[1];
 		let inside = false;
 		for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-			const xi = polygon[i][0], yi = polygon[i][1];
-			const xj = polygon[j][0], yj = polygon[j][1];
-			const intersect = ((yi > y) !== (yj > y)) && (x < ((xj - xi) * (y - yi)) / (yj - yi + Number.EPSILON) + xi);
+			const xi = polygon[i][0],
+				yi = polygon[i][1];
+			const xj = polygon[j][0],
+				yj = polygon[j][1];
+			const intersect =
+				yi > y !== yj > y &&
+				x < ((xj - xi) * (y - yi)) / (yj - yi + Number.EPSILON) + xi;
 			if (intersect) inside = !inside;
 		}
 		return inside;
 	};
-
-
 
 	useEffect(() => {
 		console.log("calling api...");
@@ -257,7 +271,10 @@ const Map = () => {
 							(acc, c) => [acc[0] + c[0], acc[1] + c[1]],
 							[0, 0]
 						);
-						const centroid: [number, number] = [sums[0] / ring.length, sums[1] / ring.length];
+						const centroid: [number, number] = [
+							sums[0] / ring.length,
+							sums[1] / ring.length,
+						];
 						if (!pointInPolygon(centroid, queensPolygon)) return;
 
 						polyFeatures.push({
@@ -273,33 +290,35 @@ const Map = () => {
 				}
 			});
 
-				// Also handle any shapes that ended up being a single coordinate (not a polygon)
-				// The backend returns shapes (arrays of [lat, lon] pairs). If a shape has <3 points,
-				// treat it as a point marker using its first coordinate.
-				cafe_list.forEach((item: any, idx2: number) => {
-					if (Array.isArray(item) && item.length > 0 && Array.isArray(item[0])) {
-						const ring = item.map((p: any) => {
+			// Also handle any shapes that ended up being a single coordinate (not a polygon)
+			// The backend returns shapes (arrays of [lat, lon] pairs). If a shape has <3 points,
+			// treat it as a point marker using its first coordinate.
+			cafe_list.forEach((item: any, idx2: number) => {
+				if (Array.isArray(item) && item.length > 0 && Array.isArray(item[0])) {
+					const ring = item
+						.map((p: any) => {
 							const lat = Number(p?.[1]) || Number(p?.[0]);
 							const lon = Number(p?.[0]) || Number(p?.[1]);
 							return [lon, lat] as [number, number];
-						}).filter(Boolean as any) as [number, number][];
+						})
+						.filter(Boolean as any) as [number, number][];
 
-						if (ring.length < 3 && ring.length > 0) {
-							// only include point if inside queens polygon
-							if (pointInPolygon(ring[0], queensPolygon)) {
-								pointFeatures.push({
-									type: "Feature",
-									id: `cafe-point-${idx2}`,
-									geometry: { type: "Point", coordinates: ring[0] },
-									properties: {},
-								});
-							}
+					if (ring.length < 3 && ring.length > 0) {
+						// only include point if inside queens polygon
+						if (pointInPolygon(ring[0], queensPolygon)) {
+							pointFeatures.push({
+								type: "Feature",
+								id: `cafe-point-${idx2}`,
+								geometry: { type: "Point", coordinates: ring[0] },
+								properties: {},
+							});
 						}
 					}
-				});
+				}
+			});
 
-				setCafePolygons({ type: "FeatureCollection", features: polyFeatures });
-				setCafePoints({ type: "FeatureCollection", features: pointFeatures });
+			setCafePolygons({ type: "FeatureCollection", features: polyFeatures });
+			setCafePoints({ type: "FeatureCollection", features: pointFeatures });
 		} catch (error) {
 			console.error("Issue with fetching cafe data", error);
 		}
@@ -489,7 +508,6 @@ const Map = () => {
 		const map = mapRef.current;
 
 		const applyCafeData = () => {
-
 			if (cafePolygons && map.getSource && map.getSource("cafes")) {
 				(map.getSource("cafes") as GeoJSONSource).setData(cafePolygons);
 			} else if (cafePolygons) {
@@ -509,28 +527,28 @@ const Map = () => {
 			}
 
 			if (cafePolygons) {
-							if (!map.getLayer("cafes-fill")) {
-								map.addLayer({
-									id: "cafes-fill",
-									type: "fill",
-									source: "cafes",
-									paint: {
-										"fill-color": "#00FFFF",
-										"fill-opacity": 0.45,
-										"fill-outline-color": "#FFFFFF",
-									},
-								});
-							}
+				if (!map.getLayer("cafes-fill")) {
+					map.addLayer({
+						id: "cafes-fill",
+						type: "fill",
+						source: "cafes",
+						paint: {
+							"fill-color": "#00FFFF",
+							"fill-opacity": 0.45,
+							"fill-outline-color": "#FFFFFF",
+						},
+					});
+				}
 
 				if (!map.getLayer("cafes-outline")) {
 					map.addLayer({
 						id: "cafes-outline",
 						type: "line",
 						source: "cafes",
-									paint: {
-										"line-color": "#FFFFFF",
-										"line-width": 1,
-									},
+						paint: {
+							"line-color": "#FFFFFF",
+							"line-width": 1,
+						},
 					});
 				}
 			}
@@ -541,7 +559,7 @@ const Map = () => {
 						id: "cafes-points",
 						type: "circle",
 						source: "cafes-points",
-							paint: {
+						paint: {
 							"circle-radius": 4,
 							"circle-color": "rgba(0,255,255,0.45)",
 							"circle-stroke-color": "#FFFFFF",
@@ -555,7 +573,7 @@ const Map = () => {
 						id: "cafes-highlight",
 						type: "circle",
 						source: "cafes-points",
-							paint: {
+						paint: {
 							"circle-radius": 12,
 							"circle-color": "rgba(0,255,255,0.45)",
 							"circle-stroke-color": "#FFFFFF",
@@ -936,7 +954,16 @@ function SymbolLegend() {
 			</div>
 			<div style={{ height: 8 }} />
 			<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-				<div style={{ width: 0, height: 0, borderLeft: "7px solid transparent", borderRight: "7px solid transparent", borderTop: "12px solid #FFD400", filter: "drop-shadow(0 0 1px rgba(0,0,0,0.4))" }} />
+				<div
+					style={{
+						width: 0,
+						height: 0,
+						borderLeft: "7px solid transparent",
+						borderRight: "7px solid transparent",
+						borderTop: "12px solid #FFD400",
+						filter: "drop-shadow(0 0 1px rgba(0,0,0,0.4))",
+					}}
+				/>
 				<div>Organizations</div>
 			</div>
 		</div>
