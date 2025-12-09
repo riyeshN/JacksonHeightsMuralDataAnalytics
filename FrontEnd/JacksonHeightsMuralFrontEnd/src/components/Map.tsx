@@ -64,6 +64,9 @@ const Map = () => {
 		GeoJSON.Point,
 		ArtData
 	> | null>(null);
+	const [orgData, setOrgData] = useState<GeoJSON.FeatureCollection<GeoJSON.Point, any> | null>(null);
+	const [cafePolygons, setCafePolygons] = useState<GeoJSON.FeatureCollection<GeoJSON.Polygon, any> | null>(null);
+	const [cafePoints, setCafePoints] = useState<GeoJSON.FeatureCollection<GeoJSON.Point, any> | null>(null);
 	const [selectedArtId, setSelectedArtId] = useState<string | number | null>(
 		null
 	);
@@ -71,10 +74,36 @@ const Map = () => {
 		{ [name: string]: any } | undefined
 	>(undefined);
 
+	// User-supplied Queens polygon (ordered as [lon, lat] pairs)
+	const queensPolygon: Array<[number, number]> = [
+		[-73.95, 40.78], // NW
+		[-73.70, 40.78], // NE
+		[-73.70, 40.66], // SE
+		[-73.85, 40.63], // SW
+	];
+
+	// Ray-casting point-in-polygon for [lon, lat]
+	const pointInPolygon = (point: [number, number], polygon: Array<[number, number]>): boolean => {
+		const x = point[0];
+		const y = point[1];
+		let inside = false;
+		for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+			const xi = polygon[i][0], yi = polygon[i][1];
+			const xj = polygon[j][0], yj = polygon[j][1];
+			const intersect = ((yi > y) !== (yj > y)) && (x < ((xj - xi) * (y - yi)) / (yj - yi + Number.EPSILON) + xi);
+			if (intersect) inside = !inside;
+		}
+		return inside;
+	};
+
+
+
 	useEffect(() => {
 		console.log("calling api...");
 		fetchCensusDataForQueens();
 		fetchMuralDataForQueens();
+		fetchOrganizationData();
+		fetchCafeData();
 	}, []);
 
 	const fetchCensusDataForQueens = async () => {
@@ -155,12 +184,140 @@ const Map = () => {
 		}
 	};
 
+	const fetchOrganizationData = async () => {
+		try {
+			const response = await api.get("census/org_data");
+			// backend returns a list of [lat, lon] tuples
+			const org_list: Array<[number, number]> = response?.data ?? [];
+
+			const features = org_list
+				.map((item, idx) => {
+					const lat = Number(item?.[0]);
+					const lon = Number(item?.[1]);
+					if (Number.isNaN(lat) || Number.isNaN(lon)) return null;
+					return {
+						type: "Feature",
+						id: `org-${idx}`,
+						geometry: {
+							type: "Point",
+							coordinates: [lon, lat],
+						},
+						properties: {},
+					} as GeoJSON.Feature<GeoJSON.Point, any>;
+				})
+				.filter(Boolean) as GeoJSON.Feature<GeoJSON.Point, any>[];
+
+			// filter by queens polygon using centroid (point is [lon, lat])
+			const filtered = features.filter((f) => {
+				const coords = f.geometry.coordinates as [number, number];
+				return pointInPolygon(coords, queensPolygon);
+			});
+
+			const featureCollection: GeoJSON.FeatureCollection<GeoJSON.Point, any> = {
+				type: "FeatureCollection",
+				features: filtered,
+			};
+
+			setOrgData(featureCollection);
+		} catch (error) {
+			console.error("Issue with fetching organization data", error);
+		}
+	};
+
+	const fetchCafeData = async () => {
+		try {
+			const response = await api.get("census/cafe_data");
+			const cafe_list: any[] = response?.data ?? [];
+
+			const polyFeatures: GeoJSON.Feature<GeoJSON.Polygon, any>[] = [];
+			const pointFeatures: GeoJSON.Feature<GeoJSON.Point, any>[] = [];
+
+			cafe_list.forEach((item, idx) => {
+				// item expected to be an array of coordinate pairs: [[lat, lon], [lat, lon], ...]
+				if (Array.isArray(item) && item.length > 0 && Array.isArray(item[0])) {
+					const ring: Array<[number, number]> = item
+						.map((p: any) => {
+							const lat = Number(p?.[0]);
+							const lon = Number(p?.[1]);
+							if (Number.isNaN(lat) || Number.isNaN(lon)) return null;
+							return [lon, lat] as [number, number];
+						})
+						.filter(Boolean) as [number, number][];
+
+					if (ring.length >= 3) {
+						// ensure ring closed
+						const first = ring[0];
+						const last = ring[ring.length - 1];
+						if (first[0] !== last[0] || first[1] !== last[1]) {
+							ring.push(first);
+						}
+
+						// compute centroid and only include if centroid is in queens polygon
+						const sums = ring.reduce(
+							(acc, c) => [acc[0] + c[0], acc[1] + c[1]],
+							[0, 0]
+						);
+						const centroid: [number, number] = [sums[0] / ring.length, sums[1] / ring.length];
+						if (!pointInPolygon(centroid, queensPolygon)) return;
+
+						polyFeatures.push({
+							type: "Feature",
+							id: `cafe-poly-${idx}`,
+							geometry: {
+								type: "Polygon",
+								coordinates: [ring],
+							},
+							properties: {},
+						});
+					}
+				}
+			});
+
+				// Also handle any shapes that ended up being a single coordinate (not a polygon)
+				// The backend returns shapes (arrays of [lat, lon] pairs). If a shape has <3 points,
+				// treat it as a point marker using its first coordinate.
+				cafe_list.forEach((item: any, idx2: number) => {
+					if (Array.isArray(item) && item.length > 0 && Array.isArray(item[0])) {
+						const ring = item.map((p: any) => {
+							const lat = Number(p?.[1]) || Number(p?.[0]);
+							const lon = Number(p?.[0]) || Number(p?.[1]);
+							return [lon, lat] as [number, number];
+						}).filter(Boolean as any) as [number, number][];
+
+						if (ring.length < 3 && ring.length > 0) {
+							// only include point if inside queens polygon
+							if (pointInPolygon(ring[0], queensPolygon)) {
+								pointFeatures.push({
+									type: "Feature",
+									id: `cafe-point-${idx2}`,
+									geometry: { type: "Point", coordinates: ring[0] },
+									properties: {},
+								});
+							}
+						}
+					}
+				});
+
+				setCafePolygons({ type: "FeatureCollection", features: polyFeatures });
+				setCafePoints({ type: "FeatureCollection", features: pointFeatures });
+		} catch (error) {
+			console.error("Issue with fetching cafe data", error);
+		}
+	};
+
 	const reorderLayers = (map: maplibregl.Map) => {
+		// Move cafe layers earlier so murals and organization markers sit on top
 		const order = [
 			"zip-fill",
 			"zip-highlight",
+			"cafes-fill",
+			"cafes-outline",
+			"cafes-points",
+			"cafes-highlight",
 			"murals-circle",
 			"murals-highlight",
+			"orgs-pin",
+			"orgs-highlight",
 		];
 
 		order.forEach((layerId) => {
@@ -246,6 +403,186 @@ const Map = () => {
 		}
 		reorderLayers(map);
 	}, [artData]);
+
+	useEffect(() => {
+		if (!mapRef.current || !orgData) return;
+		const map = mapRef.current;
+
+		const applyOrgData = () => {
+			if (orgData && map.getSource && map.getSource("orgs")) {
+				(map.getSource("orgs") as GeoJSONSource).setData(orgData);
+				return;
+			}
+
+			if (orgData) {
+				map.addSource("orgs", {
+					type: "geojson",
+					data: orgData,
+				});
+
+				const addSymbolLayer = () => {
+					if (map.getLayer("orgs-pin")) return;
+
+					const addLayerNow = () => {
+						if (!map.getLayer("orgs-pin")) {
+							map.addLayer({
+								id: "orgs-pin",
+								type: "symbol",
+								source: "orgs",
+								layout: {
+									"text-field": "▼",
+									"text-size": 12,
+									"text-allow-overlap": true,
+									"text-ignore-placement": true,
+									"text-anchor": "bottom",
+								},
+								paint: {
+									"text-color": "#FFD400",
+									"text-halo-color": "#444444",
+									"text-halo-width": 1.2,
+								},
+							});
+						}
+
+						if (!map.getLayer("orgs-highlight")) {
+							map.addLayer({
+								id: "orgs-highlight",
+								type: "circle",
+								source: "orgs",
+								paint: {
+									"circle-radius": 12,
+									"circle-color": "#ffff00",
+									"circle-stroke-color": "#444444",
+									"circle-stroke-width": 2,
+								},
+								filter: ["==", "id", ""],
+							});
+						}
+
+						if (map.getLayer("orgs-pin")) map.moveLayer("orgs-pin");
+						if (map.getLayer("orgs-highlight")) map.moveLayer("orgs-highlight");
+						reorderLayers(map);
+					};
+
+					addLayerNow();
+				};
+
+				addSymbolLayer();
+			}
+
+			reorderLayers(map);
+		};
+
+		if (typeof map.isStyleLoaded === "function") {
+			if (!map.isStyleLoaded()) {
+				map.once("load", applyOrgData);
+			} else {
+				applyOrgData();
+			}
+		} else {
+			map.once("load", applyOrgData);
+		}
+	}, [orgData]);
+
+	useEffect(() => {
+		if (!mapRef.current || (!cafePolygons && !cafePoints)) return;
+		const map = mapRef.current;
+
+		const applyCafeData = () => {
+
+			if (cafePolygons && map.getSource && map.getSource("cafes")) {
+				(map.getSource("cafes") as GeoJSONSource).setData(cafePolygons);
+			} else if (cafePolygons) {
+				map.addSource("cafes", {
+					type: "geojson",
+					data: cafePolygons,
+				});
+			}
+
+			if (cafePoints && map.getSource && map.getSource("cafes-points")) {
+				(map.getSource("cafes-points") as GeoJSONSource).setData(cafePoints);
+			} else if (cafePoints) {
+				map.addSource("cafes-points", {
+					type: "geojson",
+					data: cafePoints,
+				});
+			}
+
+			if (cafePolygons) {
+							if (!map.getLayer("cafes-fill")) {
+								map.addLayer({
+									id: "cafes-fill",
+									type: "fill",
+									source: "cafes",
+									paint: {
+										"fill-color": "#00FFFF",
+										"fill-opacity": 0.45,
+										"fill-outline-color": "#FFFFFF",
+									},
+								});
+							}
+
+				if (!map.getLayer("cafes-outline")) {
+					map.addLayer({
+						id: "cafes-outline",
+						type: "line",
+						source: "cafes",
+									paint: {
+										"line-color": "#FFFFFF",
+										"line-width": 1,
+									},
+					});
+				}
+			}
+
+			if (cafePoints) {
+				if (!map.getLayer("cafes-points")) {
+					map.addLayer({
+						id: "cafes-points",
+						type: "circle",
+						source: "cafes-points",
+							paint: {
+							"circle-radius": 4,
+							"circle-color": "rgba(0,255,255,0.45)",
+							"circle-stroke-color": "#FFFFFF",
+							"circle-stroke-width": 1,
+						},
+					});
+				}
+
+				if (!map.getLayer("cafes-highlight")) {
+					map.addLayer({
+						id: "cafes-highlight",
+						type: "circle",
+						source: "cafes-points",
+							paint: {
+							"circle-radius": 12,
+							"circle-color": "rgba(0,255,255,0.45)",
+							"circle-stroke-color": "#FFFFFF",
+							"circle-stroke-width": 1,
+						},
+						filter: ["==", "id", ""],
+					});
+				}
+			}
+
+			if (map.getLayer("cafes-fill")) map.moveLayer("cafes-fill");
+			if (map.getLayer("cafes-outline")) map.moveLayer("cafes-outline");
+			if (map.getLayer("cafes-pin")) map.moveLayer("cafes-pin");
+			if (map.getLayer("cafes-highlight")) map.moveLayer("cafes-highlight");
+			reorderLayers(map);
+		};
+
+		if (typeof map.isStyleLoaded === "function") {
+			if (!map.isStyleLoaded()) {
+				map.once("load", applyCafeData);
+			} else {
+				applyCafeData();
+			}
+		} else {
+			map.once("load", applyCafeData);
+		}
+	}, [cafePolygons, cafePoints]);
 
 	useEffect(() => {
 		if (!mapRef.current) return;
@@ -515,6 +852,7 @@ const Map = () => {
 								style={{ width: "100%", height: "80vh" }}
 							/>
 
+							<SymbolLegend />
 							<Legend variable={selectedAttributeForHeatMap} />
 
 							{loading ? (
@@ -568,5 +906,41 @@ const Map = () => {
 		</Box>
 	);
 };
+
+function SymbolLegend() {
+	return (
+		<div
+			style={{
+				position: "absolute",
+				bottom: "160px",
+				left: "10px",
+				backgroundColor: "rgba(255,255,255,0.95)",
+				padding: "8px",
+				borderRadius: "8px",
+				fontSize: "12px",
+				boxShadow: "0px 0px 6px rgba(0,0,0,0.15)",
+				zIndex: 1100,
+			}}
+		>
+			<div style={{ fontWeight: 600, marginBottom: 6 }}>Legend</div>
+			<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+				<div
+					style={{
+						width: 14,
+						height: 14,
+						backgroundColor: "rgba(0,255,255,0.45)",
+						border: "1px solid #FFFFFF",
+					}}
+				/>
+				<div>Cafes</div>
+			</div>
+			<div style={{ height: 8 }} />
+			<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+				<div style={{ width: 0, height: 0, borderLeft: "7px solid transparent", borderRight: "7px solid transparent", borderTop: "12px solid #FFD400", filter: "drop-shadow(0 0 1px rgba(0,0,0,0.4))" }} />
+				<div>Organizations</div>
+			</div>
+		</div>
+	);
+}
 
 export default Map;

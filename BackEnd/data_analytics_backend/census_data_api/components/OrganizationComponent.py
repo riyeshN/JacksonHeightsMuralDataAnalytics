@@ -1,7 +1,7 @@
 import requests
 
 
-NYC_ORG_URL = "https://data.cityofnewyork.us/Social-Services/NYC-Community-Based-Organizations/i4kb-6ab6/data_preview"
+NYC_ORG_URL = "https://data.cityofnewyork.us/resource/i4kb-6ab6.json"
 APP_TOKEN_ = "rldrJG5WYd9xQ3fpzBT1JQr9q"
 
 class OrganizationComponent:
@@ -10,35 +10,31 @@ class OrganizationComponent:
     @staticmethod
     def get_org_data():
         url = NYC_ORG_URL
+        headers = {"X-App-Token": APP_TOKEN_}
+        params = {
+            "$limit": 5000,
+            "$select": "latitude,longitude,organization_name",
+            "$where": "latitude IS NOT NULL AND longitude IS NOT NULL",
+        }
         try:
-            response = requests.get(url)
+            response = requests.get(url, headers=headers, params=params, timeout=30)
             response.raise_for_status()
-            data = response.json()
-
-            columns = data["meta"]["view"]["columns"]
-            rows = data.get("data", [])
-
-            # Find index of Latitude and Longitude columns
-            lat_idx = None
-            lon_idx = None
-
-            for i, col in enumerate(columns):
-                if col.get("name") == "Latitude":
-                    lat_idx = i
-                if col.get("name") == "Longitude":
-                    lon_idx = i
-
-            if lat_idx is None or lon_idx is None:
-                print("Could not find Latitude/Longitude columns in dataset.")
+            try:
+                data = response.json()
+            except ValueError:
+                print("Error: response is not JSON; response text:\n", response.text[:500])
                 return []
 
-            # Extract coordinates
             coords = []
-            for row in rows:
-                lat = row[lat_idx]
-                lon = row[lon_idx]
-                if lat is not None and lon is not None:
-                    coords.append((lat, lon))
+            for item in data:
+                lat = item.get("latitude")
+                lon = item.get("longitude")
+                try:
+                    latf = float(lat)
+                    lonf = float(lon)
+                except (TypeError, ValueError):
+                    continue
+                coords.append((latf, lonf))
 
             return coords
 

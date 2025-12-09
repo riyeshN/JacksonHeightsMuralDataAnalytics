@@ -6,6 +6,7 @@ urlpatterns =  [
     path("geojson_zipcode", views.get_geojson_data, name="get_geojson_data"),
     path("art_data", views.get_art_data, name="get_art_data"),
     path("org_data", views.get_organization_data, name="get_organization_data"),
+    path("cafe_data", views.get_cafe_data, name="get_cafe_data"),
     path("mta_data", views.get_mta_data, name="get_mta_data"),
     path("census_geo_data", views.get_queens_census_data_with_geo_polygon, name="get_queens_census_data_with_geo_polygon")
 ]

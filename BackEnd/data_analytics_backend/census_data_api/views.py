@@ -5,6 +5,7 @@ from census_data_api.components.CensusComponent import CensusComponent
 from census_data_api.components.ArtDataComponent import ArtDataComponent
 from census_data_api.components.MTAComponent import MTAComponent
 from census_data_api.components.OrganizationComponent import OrganizationComponent
+from census_data_api.components.CafeComponent import CafeComponent
 
 CACHE_KEY_GEO_CENSUS = "GEO_CENSUS_DATA"
 CACHE_KEY_MURAL = "MURAL_DATA"
@@ -37,12 +38,18 @@ def get_mta_data(request):
 
 def get_organization_data(request):
     if request.method == "GET":
-        cache_data = cache.get(CACHE_KEY_ORG)
-        if cache_data is not None:
-            return JsonResponse(cache_data, status=200)
-        org_data = OrganizationComponent.get_org_data()
-        cache.set(CACHE_KEY_ORG,org_data, CACHE_TIME)
-        return JsonResponse(org_data, status=200)
+        try:
+            cache_data = cache.get(CACHE_KEY_ORG)
+            if cache_data is not None:
+                return JsonResponse(cache_data, safe=False, status=200)
+            org_data = OrganizationComponent.get_org_data()
+            cache.set(CACHE_KEY_ORG, org_data, CACHE_TIME)
+            return JsonResponse(org_data, safe=False, status=200)
+        except Exception as e:
+            import traceback
+
+            traceback.print_exc()
+            return JsonResponse({"error": str(e)}, status=500)
     else:
         return HttpResponse("Fail", status=400)
 
@@ -54,6 +61,24 @@ def get_queens_census_data_with_geo_polygon(request):
         census_and_geoploygon_data_frame = CensusComponent.get_census_data_for_queens_with_geo_polygon()
         cache.set(CACHE_KEY_GEO_CENSUS, census_and_geoploygon_data_frame, CACHE_TIME)
         return JsonResponse(census_and_geoploygon_data_frame, status=200)
+    else:
+        return HttpResponse("Fail", status=400)
+
+def get_cafe_data(request):
+    if request.method == "GET":
+        try:
+            cache_key = "CAFE_DATA"
+            cache_data = cache.get(cache_key)
+            if cache_data is not None:
+                return JsonResponse(cache_data, safe=False, status=200)
+            cafe_coords = CafeComponent.get_cafe_coords()
+            cache.set(cache_key, cafe_coords, CACHE_TIME)
+            return JsonResponse(cafe_coords, safe=False, status=200)
+        except Exception as e:
+            import traceback
+
+            traceback.print_exc()
+            return JsonResponse({"error": str(e)}, status=500)
     else:
         return HttpResponse("Fail", status=400)
 
