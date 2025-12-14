@@ -54,6 +54,10 @@ const Map = () => {
 
 	const popupRef = useRef<maplibregl.Popup | null>(null);
 
+	// add the function to control switch the cafe street
+	const [showCafe, setShowCafe] = useState(true);
+	
+
 	const [selectedAttributeForHeatMap, setSelectedAttributeForHeatMap] =
 		useState<HeatMapVariable>("PopulationDensity");
 	const [loading, setLoadingState] = useState<boolean>(true);
@@ -719,18 +723,44 @@ const Map = () => {
 			{ color: "#083e4dff", label: "120k" },
 		],
 		Age: [
-			{ color: "#edf8fb", label: "20" },
-			{ color: "#b2e2e2", label: "35" },
-			{ color: "#66c2a4", label: "50" },
-			{ color: "#238b45", label: "65" },
+			{ color: "#cbede5ff", label: "33" },
+			{ color: "#95d0cbff", label: "35" },
+			{ color: "#58b8d2ff", label: "36" },
+			{ color: "#3661beff", label: "38" },
+			{ color: "#282bccff", label: "42" },
+			{ color: "#151753ff", label: "47" },
 		],
 		PopulationDensity: [
 			{ color: "#ffffcc", label: "5k" },
 			{ color: "#a1dab4", label: "15k" },
-			{ color: "#41b6c4", label: "30k" },
+			{ color: "#63c8d3ff", label: "30k" },
 			{ color: "#225ea8", label: "60k" },
 		],
 	};
+
+    // useEffect to control the visibility of the cafe street
+	useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const layers = [
+        "cafes-fill",
+        "cafes-outline",
+        "cafes-points",
+        "cafes-highlight",
+    ];
+
+    layers.forEach(layerId => {
+        if (map.getLayer(layerId)) {
+            map.setLayoutProperty(
+                layerId,
+                "visibility",
+                showCafe ? "visible" : "none"
+                );
+            }
+        });
+	}, [showCafe]);
+
 
 	function getFillColorExpression(
 		selected: HeatMapVariable
@@ -756,14 +786,18 @@ const Map = () => {
 					"interpolate",
 					["linear"],
 					["get", "median_age"],
-					20,
-					"#edf8fb",
+					33,
+					"#cbede5ff",
 					35,
-					"#b2e2e2",
-					50,
-					"#66c2a4",
-					65,
-					"#238b45",
+					"#95d0cbff",
+					36,
+					"#58b8d2ff",
+					38,
+					"#3661beff",
+					42,
+					"#282bccff",
+					47,
+					"#151753ff",
 				];
 
 			case "PopulationDensity":
@@ -855,6 +889,12 @@ const Map = () => {
 							>
 								Population
 							</Button>
+							<Button
+    							onClick={() => setShowCafe((prev) => !prev)}
+    							    color={showCafe ? "error" : "primary"}
+							>
+    							{showCafe ? "Hide Café" : "Show Café"}
+							</Button>							
 						</ButtonGroup>
 					</Grid>
 					<Grid size={{ xs: 8 }}>
