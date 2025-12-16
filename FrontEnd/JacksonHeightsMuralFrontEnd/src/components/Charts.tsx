@@ -1,4 +1,4 @@
-import { Box, Stack, Typography } from "@mui/material";
+import { Box, Stack } from "@mui/material";
 import Grid from "@mui/material/Grid";
 import PieChartComp from "./utils/PieChart";
 
@@ -7,7 +7,6 @@ interface ChartsProps {
 }
 
 const Charts = ({ selectedArea }: ChartsProps) => {
-	console.log("chart", selectedArea);
 	const dictionary_race = {
 		"American Indian or Alaska Native":
 			selectedArea?.["american_indian_alaska_native"],

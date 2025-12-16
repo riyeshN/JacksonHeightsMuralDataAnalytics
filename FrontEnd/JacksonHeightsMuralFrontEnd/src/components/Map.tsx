@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import maplibregl, { GeoJSONSource } from "maplibre-gl";
+import maplibregl, { GeoJSONSource, Padding } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import api from "../api/census";
 import type { ExpressionSpecification } from "maplibre-gl";
@@ -7,9 +7,14 @@ import {
 	Box,
 	Button,
 	ButtonGroup,
+	Dialog,
+	DialogContent,
+	FormControlLabel,
 	Grid,
 	LinearProgress,
 	Stack,
+	Switch,
+	Typography,
 } from "@mui/material";
 import Charts from "./Charts";
 import SearchEngine from "./utils/SearchEngine";
@@ -40,6 +45,18 @@ export interface ArtData {
 	};
 }
 
+interface OrgData {
+	latitude: number;
+	longitude: number;
+	name: string;
+	website: {
+		url: string;
+	};
+	mission: string;
+	volunteer_program_description: string;
+	street_address: string;
+}
+
 interface censusData {
 	geometry: GeoJSON.Geometry;
 	pop_est: null | number;
@@ -54,9 +71,7 @@ const Map = () => {
 
 	const popupRef = useRef<maplibregl.Popup | null>(null);
 
-	// add the function to control switch the cafe street
 	const [showCafe, setShowCafe] = useState(true);
-	
 
 	const [selectedAttributeForHeatMap, setSelectedAttributeForHeatMap] =
 		useState<HeatMapVariable>("PopulationDensity");
@@ -70,8 +85,10 @@ const Map = () => {
 	> | null>(null);
 	const [orgData, setOrgData] = useState<GeoJSON.FeatureCollection<
 		GeoJSON.Point,
-		any
+		OrgData
 	> | null>(null);
+	const [selectedOrg, setSelectedOrg] = useState<OrgData | null>(null);
+	const [openOrgModal, setOpenOrgModal] = useState(false);
 	const [cafePolygons, setCafePolygons] = useState<GeoJSON.FeatureCollection<
 		GeoJSON.Polygon,
 		any
@@ -87,7 +104,6 @@ const Map = () => {
 		{ [name: string]: any } | undefined
 	>(undefined);
 
-	// User-supplied Queens polygon (ordered as [lon, lat] pairs)
 	const queensPolygon: Array<[number, number]> = [
 		[-73.95, 40.78], // NW
 		[-73.7, 40.78], // NE
@@ -95,7 +111,6 @@ const Map = () => {
 		[-73.85, 40.63], // SW
 	];
 
-	// Ray-casting point-in-polygon for [lon, lat]
 	const pointInPolygon = (
 		point: [number, number],
 		polygon: Array<[number, number]>
@@ -123,6 +138,13 @@ const Map = () => {
 		fetchOrganizationData();
 		fetchCafeData();
 	}, []);
+
+	useEffect(() => {
+		console.log("State updated:", selectedOrg);
+		if (selectedOrg !== null) {
+			setOpenOrgModal(true);
+		}
+	}, [selectedOrg]);
 
 	const fetchCensusDataForQueens = async () => {
 		try {
@@ -161,6 +183,9 @@ const Map = () => {
 			console.log(response.data?.ArtList);
 
 			const mural_data: [ArtData] = response?.data?.ArtList;
+
+			// RIYESH NATH : LLM was used to help me navigate the object structure below required for map libre to work
+			// NO COPY PASTE WAS USED
 
 			const features = mural_data.map(
 				(current) =>
@@ -205,43 +230,48 @@ const Map = () => {
 	const fetchOrganizationData = async () => {
 		try {
 			const response = await api.get("census/org_data");
-			// backend returns a list of [lat, lon] tuples
-			const org_list: Array<[number, number]> = response?.data ?? [];
-
-			const features = org_list
-				.map((item, idx) => {
-					const lat = Number(item?.[0]);
-					const lon = Number(item?.[1]);
-					if (Number.isNaN(lat) || Number.isNaN(lon)) return null;
-					return {
+			const org_data: OrgData[] = response.data;
+			const features = org_data.map(
+				(current) =>
+					({
 						type: "Feature",
-						id: `org-${idx}`,
+						id: current?.name,
 						geometry: {
 							type: "Point",
-							coordinates: [lon, lat],
+							coordinates: [
+								Number(current?.longitude),
+								Number(current?.latitude),
+							],
 						},
-						properties: {},
-					} as GeoJSON.Feature<GeoJSON.Point, any>;
-				})
-				.filter(Boolean) as GeoJSON.Feature<GeoJSON.Point, any>[];
+						properties: {
+							id: current?.name,
+							latitude: current?.latitude,
+							longitude: current?.longitude,
+							name: current?.name,
+							website: current?.website,
+							mission: current?.mission,
+							volunteer_program_description:
+								current?.volunteer_program_description,
+							street_address: current?.street_address,
+						},
+					} as GeoJSON.Feature<GeoJSON.Point, OrgData>)
+			);
 
-			// filter by queens polygon using centroid (point is [lon, lat])
-			const filtered = features.filter((f) => {
-				const coords = f.geometry.coordinates as [number, number];
-				return pointInPolygon(coords, queensPolygon);
-			});
-
-			const featureCollection: GeoJSON.FeatureCollection<GeoJSON.Point, any> = {
+			const featureCollection: GeoJSON.FeatureCollection<
+				GeoJSON.Point,
+				OrgData
+			> = {
 				type: "FeatureCollection",
-				features: filtered,
+				features,
 			};
 
 			setOrgData(featureCollection);
 		} catch (error) {
-			console.error("Issue with fetching organization data", error);
+			alert(`Issue with fetching organization data ${error}`);
 		}
 	};
 
+	//ASH to comment on since this looks to be LLM generated.
 	const fetchCafeData = async () => {
 		try {
 			const response = await api.get("census/cafe_data");
@@ -328,8 +358,9 @@ const Map = () => {
 		}
 	};
 
+	// RIYESH NATH : I created this function myself but had to use brainstorm with LLM to deal with rendering time issue
+	// NO COPY PASTE WAS USED
 	const reorderLayers = (map: maplibregl.Map) => {
-		// Move cafe layers earlier so murals and organization markers sit on top
 		const order = [
 			"zip-fill",
 			"zip-highlight",
@@ -350,6 +381,7 @@ const Map = () => {
 		});
 	};
 
+	// RIYESH NATH: Used LLM's help to get longitude and latitude of Queen's center.
 	useEffect(() => {
 		if (!mapContainerRef.current) return;
 
@@ -380,6 +412,8 @@ const Map = () => {
 		};
 	}, []);
 
+	// RIYESH NATH : LLM was used to help me navigate the object structure below required for map libre to work
+	// NO COPY PASTE WAS USED
 	useEffect(() => {
 		if (!mapRef.current || !artData) return;
 		const map = mapRef.current;
@@ -431,80 +465,80 @@ const Map = () => {
 		if (!mapRef.current || !orgData) return;
 		const map = mapRef.current;
 
-		const applyOrgData = () => {
-			if (orgData && map.getSource && map.getSource("orgs")) {
-				(map.getSource("orgs") as GeoJSONSource).setData(orgData);
-				return;
-			}
+		if (orgData && map.getSource && map.getSource("orgs")) {
+			(map.getSource("orgs") as GeoJSONSource).setData(orgData);
+			return;
+		}
 
-			if (orgData) {
-				map.addSource("orgs", {
-					type: "geojson",
-					data: orgData,
-				});
+		if (orgData) {
+			map.addSource("orgs", {
+				type: "geojson",
+				data: orgData,
+				promoteId: "id", //Riyesh Nath: Had to use LLM's help since all pin's id gave me 0.
+			});
 
-				const addSymbolLayer = () => {
-					if (map.getLayer("orgs-pin")) return;
+			const addSymbolLayer = () => {
+				if (map.getLayer("orgs-pin")) return;
 
-					const addLayerNow = () => {
-						if (!map.getLayer("orgs-pin")) {
-							map.addLayer({
-								id: "orgs-pin",
-								type: "symbol",
-								source: "orgs",
-								layout: {
-									"text-field": "▼",
-									"text-size": 12,
-									"text-allow-overlap": true,
-									"text-ignore-placement": true,
-									"text-anchor": "bottom",
-								},
-								paint: {
-									"text-color": "#FFD400",
-									"text-halo-color": "#444444",
-									"text-halo-width": 1.2,
-								},
-							});
-						}
+				const addLayerNow = () => {
+					if (!map.getLayer("orgs-pin")) {
+						map.addLayer({
+							id: "orgs-pin",
+							type: "symbol",
+							source: "orgs",
+							layout: {
+								"text-field": "▼",
+								"text-size": 20,
+								"text-allow-overlap": true,
+								"text-ignore-placement": true,
+								"text-anchor": "bottom",
+							},
+							paint: {
+								"text-color": [
+									"case",
+									["boolean", ["feature-state", "hover"], false],
+									"#A020F0",
+									"#FFD400",
+								],
+								"text-halo-color": "#444444",
+								"text-halo-width": 2.2,
+							},
+						});
+					}
 
-						if (!map.getLayer("orgs-highlight")) {
-							map.addLayer({
-								id: "orgs-highlight",
-								type: "circle",
-								source: "orgs",
-								paint: {
-									"circle-radius": 12,
-									"circle-color": "#ffff00",
-									"circle-stroke-color": "#444444",
-									"circle-stroke-width": 2,
-								},
-								filter: ["==", "id", ""],
-							});
-						}
+					if (map.getLayer("orgs-pin")) map.moveLayer("orgs-pin");
 
-						if (map.getLayer("orgs-pin")) map.moveLayer("orgs-pin");
-						if (map.getLayer("orgs-highlight")) map.moveLayer("orgs-highlight");
-						reorderLayers(map);
-					};
-
-					addLayerNow();
+					reorderLayers(map);
 				};
 
-				addSymbolLayer();
-			}
+				addLayerNow();
+			};
 
-			reorderLayers(map);
-		};
-
-		if (typeof map.isStyleLoaded === "function") {
-			if (!map.isStyleLoaded()) {
-				map.once("load", applyOrgData);
-			} else {
-				applyOrgData();
-			}
-		} else {
-			map.once("load", applyOrgData);
+			addSymbolLayer();
 		}
+
+		map.on("mousemove", "orgs-pin", (e) => {
+			map.getCanvas().style.cursor = "pointer";
+
+			if (e.features != null && e.features.length > 0) {
+				map.removeFeatureState({ source: "orgs" });
+				map.setFeatureState(
+					{ source: "orgs", id: e.features[0].id },
+					{ hover: true }
+				);
+			}
+		});
+
+		map.on("mouseleave", "orgs-pin", () => {
+			map.getCanvas().style.cursor = "";
+			map.removeFeatureState({ source: "orgs" });
+		});
+
+		map.on("click", "orgs-pin", (e) => {
+			setSelectedOrg(e.features?.[0].properties as OrgData);
+		});
+
+		reorderLayers(map);
 	}, [orgData]);
 
 	useEffect(() => {
@@ -723,44 +757,43 @@ const Map = () => {
 			{ color: "#083e4dff", label: "120k" },
 		],
 		Age: [
-			{ color: "#cbede5ff", label: "33" },
-			{ color: "#95d0cbff", label: "35" },
-			{ color: "#58b8d2ff", label: "36" },
-			{ color: "#3661beff", label: "38" },
-			{ color: "#282bccff", label: "42" },
-			{ color: "#151753ff", label: "47" },
+			{ color: "#f5f9faff", label: "33" },
+			{ color: "#8ec7d6ff", label: "35" },
+			{ color: "#81c0d1ff", label: "36" },
+			{ color: "#337385ff", label: "38" },
+			{ color: "#123d49ff", label: "42" },
+			{ color: "#083e4dff", label: "47" },
 		],
 		PopulationDensity: [
-			{ color: "#ffffcc", label: "5k" },
-			{ color: "#a1dab4", label: "15k" },
-			{ color: "#63c8d3ff", label: "30k" },
-			{ color: "#225ea8", label: "60k" },
+			{ color: "#f5f9faff", label: "5k" },
+			{ color: "#8ec7d6ff", label: "15k" },
+			{ color: "#337385ff", label: "30k" },
+			{ color: "#083e4dff", label: "60k" },
 		],
 	};
 
-    // useEffect to control the visibility of the cafe street
+	// useEffect to control the visibility of the cafe street
 	useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
+		const map = mapRef.current;
+		if (!map) return;
 
-    const layers = [
-        "cafes-fill",
-        "cafes-outline",
-        "cafes-points",
-        "cafes-highlight",
-    ];
+		const layers = [
+			"cafes-fill",
+			"cafes-outline",
+			"cafes-points",
+			"cafes-highlight",
+		];
 
-    layers.forEach(layerId => {
-        if (map.getLayer(layerId)) {
-            map.setLayoutProperty(
-                layerId,
-                "visibility",
-                showCafe ? "visible" : "none"
-                );
-            }
-        });
+		layers.forEach((layerId) => {
+			if (map.getLayer(layerId)) {
+				map.setLayoutProperty(
+					layerId,
+					"visibility",
+					showCafe ? "visible" : "none"
+				);
+			}
+		});
 	}, [showCafe]);
-
 
 	function getFillColorExpression(
 		selected: HeatMapVariable
@@ -787,17 +820,17 @@ const Map = () => {
 					["linear"],
 					["get", "median_age"],
 					33,
-					"#cbede5ff",
+					"#f5f9faff",
 					35,
-					"#95d0cbff",
+					"#8ec7d6ff",
 					36,
-					"#58b8d2ff",
+					"#81c0d1ff",
 					38,
-					"#3661beff",
+					"#337385ff",
 					42,
-					"#282bccff",
+					"#123d49ff",
 					47,
-					"#151753ff",
+					"#083e4dff",
 				];
 
 			case "PopulationDensity":
@@ -806,13 +839,13 @@ const Map = () => {
 					["linear"],
 					["get", "total_population"],
 					5000,
-					"#ffffcc",
+					"#f5f9faff",
 					15000,
-					"#a1dab4",
+					"#8ec7d6ff",
 					30000,
-					"#41b6c4",
+					"#337385ff",
 					60000,
-					"#225ea8",
+					"#083e4dff",
 				];
 		}
 	}
@@ -889,13 +922,17 @@ const Map = () => {
 							>
 								Population
 							</Button>
-							<Button
-    							onClick={() => setShowCafe((prev) => !prev)}
-    							    color={showCafe ? "error" : "primary"}
-							>
-    							{showCafe ? "Hide Café" : "Show Café"}
-							</Button>							
 						</ButtonGroup>
+						<FormControlLabel
+							sx={{ padding: 2 }}
+							control={
+								<Switch
+									checked={showCafe}
+									onChange={() => setShowCafe((prev) => !prev)}
+								/>
+							}
+							label={showCafe ? "Hide Cafe" : "Show Cafe"}
+						/>
 					</Grid>
 					<Grid size={{ xs: 8 }}>
 						<div
@@ -961,6 +998,42 @@ const Map = () => {
 
 				<Charts selectedArea={selectedAreaProp} />
 			</Stack>
+			<Dialog
+				open={openOrgModal}
+				onClose={() => {
+					setOpenOrgModal(false);
+					setSelectedOrg(null);
+				}}
+			>
+				<DialogContent>
+					<Stack spacing={1} padding={1}>
+						<Typography
+							variant="h6"
+							sx={{ fontWeight: "bold", alignContent: "center" }}
+						>
+							{`NAME: ${selectedOrg?.name}`}
+						</Typography>
+						<Typography
+							variant="h6"
+							sx={{ fontWeight: "bold", alignContent: "center" }}
+						>
+							{`Mission: ${selectedOrg?.mission}`}
+						</Typography>
+						<Typography
+							variant="h6"
+							sx={{ fontWeight: "bold", alignContent: "center" }}
+						>
+							{`Description: ${selectedOrg?.volunteer_program_description}`}
+						</Typography>
+						<Typography
+							variant="h6"
+							sx={{ fontWeight: "bold", alignContent: "center" }}
+						>
+							{`Website: ${selectedOrg?.website}`}
+						</Typography>
+					</Stack>
+				</DialogContent>
+			</Dialog>
 		</Box>
 	);
 };
