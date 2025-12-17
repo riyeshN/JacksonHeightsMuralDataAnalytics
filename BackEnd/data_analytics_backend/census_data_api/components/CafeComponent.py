@@ -1,5 +1,10 @@
 import requests
 
+
+'''
+LLM's were used to help get an idea of how to retrieve the NYC Open data, then some suggestions helped in implementing 
+'''
+
 NYC_CAFE_URL = "https://data.cityofnewyork.us/api/v3/views/ptd9-4c6m/query.json"
 APP_TOKEN_ = "rldrJG5WYd9xQ3fpzBT1JQr9q"
 
@@ -13,9 +18,9 @@ class CafeComponent:
             response.raise_for_status()
             data = response.json()
 
-            # response.json() can be a dict with a "data" key or a list of rows.
+            #response.json() can be a dict with a "data" key or a list of rows.
             rows = []
-            if isinstance(data, dict):
+            if isinstance(data, dict)
                 rows = data.get("data", [])
             elif isinstance(data, list):
                 rows = data
@@ -25,7 +30,7 @@ class CafeComponent:
                 if isinstance(row, (list, tuple)) and len(row) > 0:
                     geom_list.append(row[0])
                 else:
-                    # if row is a dict or other structure, append it directly
+                    #if row is a dict or other structure, append it directly
                     geom_list.append(row)
 
             return geom_list
