@@ -17,6 +17,9 @@ interface SearchEngineProps {
 	onSelectMural?: (feature: ArtFeature) => void;
 }
 
+//Riyesh Nath: This is a class that allows us to render the search engine.
+//I had to add GeoJSON.FeatureCollection<GeoJSON.Point, ArtData> in Map.tsx since using that allowed me to use it here
+//having types makes it easier to code and not put in new bugs.
 const SearchEngine = ({ artData, onSelectMural }: SearchEngineProps) => {
 	const [query, setQuery] = useState("");
 	const [page, setPage] = useState(1);
@@ -25,6 +28,8 @@ const SearchEngine = ({ artData, onSelectMural }: SearchEngineProps) => {
 	useEffect(() => {
 		setPage(1);
 	}, [query]);
+
+	//Riyesh Nath: useMemo allows caching for queries.
 
 	const filteredMurals = useMemo(() => {
 		if (!artData || !artData.features) {
@@ -72,6 +77,7 @@ const SearchEngine = ({ artData, onSelectMural }: SearchEngineProps) => {
 		return Math.ceil(filteredMurals.length / pageSize);
 	}, [filteredMurals]);
 
+	//Riyesh Nath: Pagination is used to not show all art piece in one go.
 	const pagedMurals = useMemo(() => {
 		const start = (page - 1) * pageSize;
 		const end = start + pageSize;

@@ -15,6 +15,8 @@ const COLORS = [
 	"#1cc221ff",
 ];
 
+//Riyesh Nath: created a class using ReChart. This just allows us to create a Pie Chart given attribures and the numberica value of it
+//The COLORS become recyled. we can add more if needed
 const PieChartComp = ({ dataDict, heading }: PieProps) => {
 	const data = Object.entries(dataDict).map(([key, value]) => ({
 		name: key,

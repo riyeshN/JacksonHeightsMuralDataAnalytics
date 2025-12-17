@@ -132,6 +132,7 @@ const Map = () => {
 		return inside;
 	};
 
+	//RIYESH NATH -- I just use this to call one api at a time.
 	useEffect(() => {
 		console.log("calling api...");
 		fetchCensusDataForQueens();
@@ -140,6 +141,8 @@ const Map = () => {
 		fetchCafeData();
 	}, []);
 
+	//Riyesh Nath -- this allows us to set modal to true when state for selected organization is not null. This state is updated
+	//elsewhere in the code when user clicks the pin. It is in useEffect for orgData where map overlays for that is placed.
 	useEffect(() => {
 		console.log("State updated:", selectedOrg);
 		if (selectedOrg !== null) {
@@ -147,6 +150,8 @@ const Map = () => {
 		}
 	}, [selectedOrg]);
 
+	//Riyesh Nath -- this just calls api to get census data setting the property of zip
+	//with this polygon into a state.
 	const fetchCensusDataForQueens = async () => {
 		try {
 			const response = await api.get("census/census_geo_data");
@@ -178,6 +183,9 @@ const Map = () => {
 		}
 	};
 
+	//Riyesh Nath -- This just fetches the mural data, created needed GeoJson types objects. I tried to bind it to proper types
+	//so they are easier to use and hopefully type cast allows use not have errors (avoid any if possible)
+	//I use LLM to help me understand the GeoJson object types specially where I wanted to use my interfaces for ArtData
 	const fetchMuralDataForQueens = async () => {
 		try {
 			const response = await api.get("census/art_data");
@@ -227,6 +235,7 @@ const Map = () => {
 		}
 	};
 
+	//Riyesh Nath -- this is the same process as fetching ArtDate above.
 	const fetchOrganizationData = async () => {
 		try {
 			const response = await api.get("census/org_data");
@@ -389,7 +398,7 @@ const Map = () => {
 			mapRef.current = new maplibregl.Map({
 				container: mapContainerRef.current,
 				style: `https://api.maptiler.com/maps/darkmatter/style.json?key=${KEY}`,
-				center: [-73.885, 40.75],
+				center: [-73.885, 40.75], ///This is the LLM help I refer to above.
 				zoom: 10,
 				minZoom: 10,
 				maxZoom: 12,
@@ -461,6 +470,8 @@ const Map = () => {
 		reorderLayers(map);
 	}, [artData]);
 
+	//When orgData is set after the api fetches the value. we apply mouseover to make sure that we set hover to true using id
+	//This allows us to change color using paint attribute below.
 	useEffect(() => {
 		if (!mapRef.current || !orgData) return;
 		const map = mapRef.current;
@@ -521,7 +532,7 @@ const Map = () => {
 			map.getCanvas().style.cursor = "pointer";
 
 			if (e.features != null && e.features.length > 0) {
-				map.removeFeatureState({ source: "orgs" });
+				map.removeFeatureState({ source: "orgs" }); //Riyesh Nath: LLM was used to help me here since the color didn't delete
 				map.setFeatureState(
 					{ source: "orgs", id: e.features[0].id },
 					{ hover: true }
@@ -538,6 +549,7 @@ const Map = () => {
 			const prop = e.features?.[0].properties;
 			const copy_prop = { ...prop };
 
+			//Riyesh Nath: we had to apply the JSON parse below since the nested object was flattened by GEOObj
 			if (typeof copy_prop.website === "string") {
 				try {
 					copy_prop.website = JSON.parse(copy_prop.website);
@@ -552,6 +564,7 @@ const Map = () => {
 		reorderLayers(map);
 	}, [orgData]);
 
+	//Riyesh Nath -> Whoever wrote this - if LLM was used please comment.
 	useEffect(() => {
 		if (!mapRef.current || (!cafePolygons && !cafePoints)) return;
 		const map = mapRef.current;
@@ -651,6 +664,7 @@ const Map = () => {
 		}
 	}, [cafePolygons, cafePoints]);
 
+	//Riyesh Nath: This is used to help us know which art is selected from search. this allows us to highlight to yellow
 	useEffect(() => {
 		if (!mapRef.current) return;
 		const map = mapRef.current;
@@ -664,6 +678,7 @@ const Map = () => {
 		reorderLayers(map);
 	}, [selectedArtId]);
 
+	//Riyesh Nath: SImilar to other useEffect where we add map layering after geoObject is set.
 	useEffect(() => {
 		if (!mapRef.current || !geoObject) return;
 		const map = mapRef.current;
@@ -708,6 +723,7 @@ const Map = () => {
 			map.moveLayer("murals-circle");
 		}
 
+		//CHU: Allows pop up of data.
 		map.on("mousemove", "zip-fill", (e) => {
 			const props = e.features?.[0]?.properties;
 			if (!props || !popupRef.current) return;
