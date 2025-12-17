@@ -71,6 +71,7 @@ const Map = () => {
 	const mapRef = useRef<maplibregl.Map | null>(null);
 
 	const popupRef = useRef<maplibregl.Popup | null>(null);
+	const poporgRef = useRef<maplibregl.Popup | null>(null);
 
 	const [showCafe, setShowCafe] = useState(true);
 
@@ -470,6 +471,26 @@ const Map = () => {
 		reorderLayers(map);
 	}, [artData]);
 
+	// CHU: LLM helped to initialize the popups once, since the informations did not show on the map
+	useEffect(() => {
+  		popupRef.current = new maplibregl.Popup({
+    	closeButton: false,
+    	closeOnClick: false,
+    	className: "zip-popup",
+  	});
+
+  		poporgRef.current = new maplibregl.Popup({
+    	closeButton: false,
+    	closeOnClick: false,
+    	className: "org-popup",
+  	});
+
+  	return () => {
+    	popupRef.current?.remove();
+    	poporgRef.current?.remove();
+ 	 };
+  }, []); 
+
 	//When orgData is set after the api fetches the value. we apply mouseover to make sure that we set hover to true using id
 	//This allows us to change color using paint attribute below.
 	useEffect(() => {
@@ -538,11 +559,28 @@ const Map = () => {
 					{ hover: true }
 				);
 			}
+			
+			// CHU: add the table when your mouse move on the point
+			const org_features = e.features?.[0];
+			if (!org_features || !poporgRef.current) return;
+			popupRef.current?.remove();
+
+			const org = org_features.properties;
+			
+			const html = `
+				<div style = "font-size: 16px;">
+					<strong>Organizaion: </strong>${org.name ?? "N/A"}<br/>
+                    <strong>Street address: </strong>${org.street_address ?? "N/A"}
+				</div>
+			`;
+
+			poporgRef.current.setLngLat(e.lngLat).setHTML(html).addTo(map);
 		});
 
 		map.on("mouseleave", "orgs-pin", () => {
 			map.getCanvas().style.cursor = "";
 			map.removeFeatureState({ source: "orgs" });
+			poporgRef.current?.remove();
 		});
 
 		map.on("click", "orgs-pin", (e) => {
@@ -623,8 +661,8 @@ const Map = () => {
 						source: "cafes-points",
 						paint: {
 							"circle-radius": 4,
-							"circle-color": "rgba(0,255,255,0.45)",
-							"circle-stroke-color": "#FFFFFF",
+							"circle-color": "rgba(123, 188, 188, 0.35)",
+							"circle-stroke-color": "#ada7e3ff",
 							"circle-stroke-width": 1,
 						},
 					});
@@ -723,27 +761,36 @@ const Map = () => {
 			map.moveLayer("murals-circle");
 		}
 
-		//CHU: Allows pop up of data.
-		map.on("mousemove", "zip-fill", (e) => {
-			const props = e.features?.[0]?.properties;
+		//CHU: Allows pop up of data. LLM helped me to find the function can be used 
+		map.on("mousemove", "zip-fill", (element) => {
+			// Used LLM to help me the conflict of cafe hide function and another pop function on the zip code
+			const orgVisible = 
+			map.getLayer("orgs-pin") && 
+			map.getLayoutProperty("orgs-pin", "visibility") !== "none";
+
+			if (orgVisible) {
+				const hasOrg = map.queryRenderedFeatures(element.point, {
+				layers: ["orgs-pin"],
+				}).length > 0;
+				if (hasOrg) return;
+			 }
+
+			const props = element.features?.[0]?.properties;
 			if (!props || !popupRef.current) return;
+			poporgRef.current?.remove();
 
 			const html = `
 				<div style = "font-size: 14px;">
 					<strong>ZIP: </strong>${props.zip_code}<br/>
-                    <strong>Income: </strong>${
-											props.median_household_income ?? "N/A"
-										}<br/>
+                    <strong>Income: </strong>${props.median_household_income ?? "N/A"}<br/>
                     <strong>Age: </strong>${props.median_age ?? "N/A"}<br/>
-                    <strong>Population: </strong>${
-											props.total_population ?? "N/A"
-										}
+                    <strong>Population: </strong>${props.total_population ?? "N/A"}
 				</div>
 			`;
 
-			popupRef.current.setLngLat(e.lngLat).setHTML(html).addTo(map);
+			popupRef.current.setLngLat(element.lngLat).setHTML(html).addTo(map);
 		});
-
+		
 		map.on("mouseleave", "zip-fill", () => {
 			if (popupRef.current) {
 				popupRef.current.remove();
@@ -800,6 +847,7 @@ const Map = () => {
 	};
 
 	// useEffect to control the visibility of the cafe street
+	// CHU: Used LLM to help me find out how can I use these functions
 	useEffect(() => {
 		const map = mapRef.current;
 		if (!map) return;
@@ -877,6 +925,7 @@ const Map = () => {
 		}
 	}
 
+	// Used LLM to figure which should on the top (map should)
 	const Legend = ({ variable }: { variable: HeatMapVariable }) => {
 		const items = LEGENDS[variable];
 
@@ -955,7 +1004,7 @@ const Map = () => {
 							control={
 								<Switch
 									checked={showCafe}
-									onChange={() => setShowCafe((prev) => !prev)}
+									onChange={() => setShowCafe((prev) => !prev)} 
 								/>
 							}
 							label={showCafe ? "Hide Cafe" : "Show Cafe"}
