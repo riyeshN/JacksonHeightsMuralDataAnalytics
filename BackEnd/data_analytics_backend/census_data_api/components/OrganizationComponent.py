@@ -1,5 +1,9 @@
 import requests
 
+'''
+LLM's were used to help get an idea of how to retrieve the NYC Open data, then some suggestions helped in implementing 
+'''
+
 NYC_ORG_URL = "https://data.cityofnewyork.us/resource/i4kb-6ab6.json"
 APP_TOKEN_ = "rldrJG5WYd9xQ3fpzBT1JQr9q"
 QUEENS_ZIPS = [
