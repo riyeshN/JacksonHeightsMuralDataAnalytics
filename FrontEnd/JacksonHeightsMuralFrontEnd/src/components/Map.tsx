@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import maplibregl, { GeoJSONSource, Padding } from "maplibre-gl";
+import maplibregl, { GeoJSONSource } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import api from "../api/census";
 import type { ExpressionSpecification } from "maplibre-gl";
@@ -9,6 +9,7 @@ import {
 	ButtonGroup,
 	Dialog,
 	DialogContent,
+	Divider,
 	FormControlLabel,
 	Grid,
 	LinearProgress,
@@ -180,7 +181,6 @@ const Map = () => {
 	const fetchMuralDataForQueens = async () => {
 		try {
 			const response = await api.get("census/art_data");
-			console.log(response.data?.ArtList);
 
 			const mural_data: [ArtData] = response?.data?.ArtList;
 
@@ -271,7 +271,7 @@ const Map = () => {
 		}
 	};
 
-	//ASH to comment on since this looks to be LLM generated.
+	//RIYESH NATH -> ASH to comment on since this looks to be LLM generated.
 	const fetchCafeData = async () => {
 		try {
 			const response = await api.get("census/cafe_data");
@@ -535,7 +535,18 @@ const Map = () => {
 		});
 
 		map.on("click", "orgs-pin", (e) => {
-			setSelectedOrg(e.features?.[0].properties as OrgData);
+			const prop = e.features?.[0].properties;
+			const copy_prop = { ...prop };
+
+			if (typeof copy_prop.website === "string") {
+				try {
+					copy_prop.website = JSON.parse(copy_prop.website);
+				} catch (err) {
+					console.warn("Failed to parse website JSON", err);
+				}
+			}
+
+			setSelectedOrg(copy_prop as OrgData);
 		});
 
 		reorderLayers(map);
@@ -934,7 +945,7 @@ const Map = () => {
 							label={showCafe ? "Hide Cafe" : "Show Cafe"}
 						/>
 					</Grid>
-					<Grid size={{ xs: 8 }}>
+					<Grid size={{ xs: 12, md: 8 }}>
 						<div
 							style={{
 								position: "relative",
@@ -948,6 +959,7 @@ const Map = () => {
 							/>
 
 							<SymbolLegend />
+
 							<Legend variable={selectedAttributeForHeatMap} />
 
 							{loading ? (
@@ -969,7 +981,7 @@ const Map = () => {
 							)}
 						</div>
 					</Grid>
-					<Grid size={{ xs: 4 }}>
+					<Grid size={{ xs: 12, md: 4 }}>
 						<SearchEngine
 							artData={artData}
 							onSelectMural={(feature) => {
@@ -1006,31 +1018,43 @@ const Map = () => {
 				}}
 			>
 				<DialogContent>
-					<Stack spacing={1} padding={1}>
-						<Typography
-							variant="h6"
-							sx={{ fontWeight: "bold", alignContent: "center" }}
-						>
-							{`NAME: ${selectedOrg?.name}`}
-						</Typography>
-						<Typography
-							variant="h6"
-							sx={{ fontWeight: "bold", alignContent: "center" }}
-						>
-							{`Mission: ${selectedOrg?.mission}`}
-						</Typography>
-						<Typography
-							variant="h6"
-							sx={{ fontWeight: "bold", alignContent: "center" }}
-						>
-							{`Description: ${selectedOrg?.volunteer_program_description}`}
-						</Typography>
-						<Typography
-							variant="h6"
-							sx={{ fontWeight: "bold", alignContent: "center" }}
-						>
-							{`Website: ${selectedOrg?.website}`}
-						</Typography>
+					<Stack spacing={2} padding={1}>
+						<Box>
+							<Typography variant="overline" color="text.secondary">
+								Organization
+							</Typography>
+							<Typography variant="h5" component="div" fontWeight="bold">
+								{selectedOrg?.name || "Unknown Name"}
+							</Typography>
+							<Divider />
+						</Box>
+						<Box>
+							<Typography variant="subtitle2" fontWeight="bold" color="primary">
+								Mission
+							</Typography>
+							<Typography variant="body2" color="text.primary" sx={{ mb: 2 }}>
+								{selectedOrg?.mission || "No mission statement available."}
+							</Typography>
+
+							<Typography variant="subtitle2" fontWeight="bold" color="primary">
+								Volunteer Program
+							</Typography>
+							<Typography variant="body2" color="text.primary">
+								{selectedOrg?.volunteer_program_description ||
+									"No description available."}
+							</Typography>
+						</Box>
+						{selectedOrg?.website && (
+							<Button
+								variant="contained"
+								onClick={() => {
+									console.log(selectedOrg);
+									window.open(selectedOrg.website.url, "_blank");
+								}}
+							>
+								Visit Website
+							</Button>
+						)}
 					</Stack>
 				</DialogContent>
 			</Dialog>
