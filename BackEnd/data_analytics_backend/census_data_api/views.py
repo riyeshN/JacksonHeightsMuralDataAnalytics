@@ -7,6 +7,7 @@ from census_data_api.components.MTAComponent import MTAComponent
 from census_data_api.components.OrganizationComponent import OrganizationComponent
 from census_data_api.components.CafeComponent import CafeComponent
 
+#Riyesh Nath: the key below are used to cache since alot of data from api does not change much.
 CACHE_KEY_GEO_CENSUS = "GEO_CENSUS_DATA"
 CACHE_KEY_MURAL = "MURAL_DATA"
 CACHE_KEY_MTA = "MTA_DATA"

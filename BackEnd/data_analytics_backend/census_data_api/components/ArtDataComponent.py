@@ -1,6 +1,9 @@
 from datetime import datetime, date
 import requests
 
+#RIYESH NATH: This component just get art data. filters by zipcode of queens and converts
+#different endpoint data into singular Class ArtInfo. This is just used so as more endpoints
+#are added, we have come contract for how JSON should look like.
 APP_TOKEN = "NCNgs3lND8q1eIbXqtmwUIR1J"
 NYC_PUBLIC_MONUMENT_LOCATIONS_URL = "https://data.cityofnewyork.us/api/v3/views/2pg3-gcaa/query.json"
 NYC_DOT_ART = "https://data.cityofnewyork.us/api/v3/views/3r2x-bnmj/query.json"

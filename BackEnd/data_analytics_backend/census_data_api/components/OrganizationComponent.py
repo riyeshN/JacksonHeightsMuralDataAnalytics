@@ -21,6 +21,8 @@ class OrganizationComponent:
     def get_org_data():
         url = NYC_ORG_URL
         headers = {"X-App-Token": APP_TOKEN_}
+        #Riyesh Nath: Added new entry on top of Evan's change to make sure that we are
+        #getting more than just name and coordinates
         params = {
             "$limit": 5000,
             "$select": "latitude,longitude,organization_name,website,postcode,mission,"
@@ -46,6 +48,7 @@ class OrganizationComponent:
                 except (TypeError, ValueError):
                     continue
 
+                #Riyesh Nath: added filtering to make sure that we look at QUEENS only
                 if item.get("postcode") in QUEENS_ZIPS:
                     orgs.append({
                         "latitude": latf,
