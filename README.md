@@ -16,8 +16,9 @@ test
 # FRONTEND
 
 make sure that you run the command below on directory where we have package.json
-npm install
-npm run dev
+
+1. npm install
+2. npm run dev
 
 We are using react as frontend library
 Also will utilize MUI unless someone wants to do design using css. But I do not want to spend my time there haha
