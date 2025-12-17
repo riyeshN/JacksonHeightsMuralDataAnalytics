@@ -5,11 +5,11 @@
 We are using django as the backend API.
 tutorial used to start this: https://docs.djangoproject.com/en/5.2/intro/tutorial01/
 
-1 - Clone the project:
-2 - Create venv and activate it
-3 - pip install -r requirement.txt
-4 - python manage.py makemigrations
-6 - python manage.py runserver
+1. Clone the project:
+2. Create venv and activate it
+3. pip install -r requirement.txt
+4. python manage.py makemigrations
+5. python manage.py runserver
 
 test
 
