@@ -20,7 +20,7 @@ class CafeComponent:
 
             #response.json() can be a dict with a "data" key or a list of rows.
             rows = []
-            if isinstance(data, dict)
+            if isinstance(data, dict):
                 rows = data.get("data", [])
             elif isinstance(data, list):
                 rows = data
